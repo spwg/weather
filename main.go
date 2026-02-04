@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -282,19 +281,18 @@ func transformHourly(data *ForecastResponse) []HourlyRow {
 		loc = time.UTC
 	}
 	now := time.Now().In(loc)
-	today := now.Format("2006-01-02")
 
 	var rows []HourlyRow
 	for i, ts := range data.Hourly.Time {
-		if !strings.HasPrefix(ts, today) {
-			continue
-		}
 		t, err := time.ParseInLocation("2006-01-02T15:04", ts, loc)
 		if err != nil {
 			continue
 		}
 		if t.Before(now.Truncate(time.Hour)) {
 			continue
+		}
+		if len(rows) >= 12 {
+			break
 		}
 		rows = append(rows, HourlyRow{
 			Time:      t.Format("3 PM"),

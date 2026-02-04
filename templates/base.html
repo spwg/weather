@@ -206,12 +206,33 @@
       }
     }
 
+    // --- Live clock ---
+
+    function startClock() {
+      var el = document.getElementById('local-clock');
+      if (!el) return;
+      var tz = el.getAttribute('data-tz');
+      function tick() {
+        try {
+          el.textContent = new Date().toLocaleString('en-US', {
+            timeZone: tz,
+            hour: 'numeric', minute: '2-digit', second: '2-digit',
+            hour12: true, timeZoneName: 'short'
+          });
+        } catch(e) { el.textContent = tz; }
+      }
+      tick();
+      if (window._clockInterval) clearInterval(window._clockInterval);
+      window._clockInterval = setInterval(tick, 1000);
+    }
+
     // --- htmx afterSwap sync ---
 
     document.body.addEventListener('htmx:afterSwap', function(e) {
       if (e.detail.target.id === 'forecast-container') {
         updateStarState();
         renderFavorites();
+        startClock();
       }
       if (e.detail.target.id === 'search-results') {
         searchActiveIndex = -1;
