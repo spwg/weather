@@ -1,0 +1,12 @@
+{{define "search.html"}}
+<ul class="search-results-list">
+  {{range .Results}}
+  <li hx-get="/forecast?lat={{.Lat}}&lon={{.Lon}}&name={{.FullName}}"
+      hx-target="#forecast-container"
+      hx-on::after-request="document.getElementById('search-results').innerHTML='';document.getElementById('search-input').value='{{.FullName}}';setHash('{{.Lat}}','{{.Lon}}','{{.FullName}}');">
+    <span class="result-name">{{.Name}}</span>
+    <span class="result-detail">{{.Detail}}</span>
+  </li>
+  {{end}}
+</ul>
+{{end}}

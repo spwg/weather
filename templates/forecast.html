@@ -1,0 +1,140 @@
+{{define "forecast.html"}}
+<div class="forecast">
+  <div class="location-header">
+    <span class="location-name">{{.Name}}</span>
+    <button class="fav-star" id="fav-star-btn"
+            data-lat="{{.Lat}}" data-lon="{{.Lon}}" data-name="{{.Name}}"
+            onclick="toggleFavorite(this)" title="Add to favorites">&#9734;</button>
+    <span class="location-meta">{{.Timezone}} · elev {{.Elevation}}ft</span>
+  </div>
+
+  {{if .Hours}}
+  <section class="section">
+    <h2>Today Hourly</h2>
+    <div class="table-wrap">
+      <table class="hourly-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th class="num">Temp</th>
+            <th class="num">Feels</th>
+            <th class="num">Precip</th>
+            <th class="num">Wind</th>
+            <th>Conditions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Hours}}
+          <tr{{if .IsNow}} class="row-now"{{end}}>
+            <td class="time-col">{{.Time}}</td>
+            <td class="num temp">{{.Temp}}°</td>
+            <td class="num feels">{{.FeelsLike}}°</td>
+            <td class="num precip{{if ne .Precip "0.00"}} has-precip{{end}}">{{.Precip}}"</td>
+            <td class="num wind">{{.WindSpeed}} {{.WindDir}}</td>
+            <td class="cond">{{.Condition}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+        {{if .MoreHours}}
+        <tbody id="more-hours" class="hidden">
+          {{range .MoreHours}}
+          <tr{{if .IsNow}} class="row-now"{{end}}>
+            <td class="time-col">{{.Time}}</td>
+            <td class="num temp">{{.Temp}}°</td>
+            <td class="num feels">{{.FeelsLike}}°</td>
+            <td class="num precip{{if ne .Precip "0.00"}} has-precip{{end}}">{{.Precip}}"</td>
+            <td class="num wind">{{.WindSpeed}} {{.WindDir}}</td>
+            <td class="cond">{{.Condition}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="6" class="show-more-cell">
+              <button class="show-more-btn" onclick="var el=document.getElementById('more-hours');var h=el.classList.contains('hidden');el.classList.toggle('hidden');this.textContent=h?'Show less':'Show {{.MoreCount}} more hours';">Show {{.MoreCount}} more hours</button>
+            </td>
+          </tr>
+        </tfoot>
+        {{end}}
+      </table>
+    </div>
+  </section>
+  {{end}}
+
+  {{if .Days}}
+  <section class="section">
+    <h2>7-Day Forecast</h2>
+    <div class="table-wrap">
+      <table class="daily-table">
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th class="bar-header" colspan="1">Temperature {{.GlobalLow}}°–{{.GlobalHigh}}°</th>
+            <th class="num">Precip</th>
+            <th class="num">Wind</th>
+            <th>Conditions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Days}}
+          <tr{{if .IsToday}} class="row-now"{{end}}>
+            <td class="day-col">{{.Date}}</td>
+            <td class="bar-cell">
+              <div class="temp-bar-row">
+                <span class="temp-low">{{.Low}}°</span>
+                <div class="temp-bar-track">
+                  <div class="temp-bar-fill" style="left:{{.BarLeft}}%;width:{{.BarWidth}}%"></div>
+                </div>
+                <span class="temp-high">{{.High}}°</span>
+              </div>
+            </td>
+            <td class="num precip{{if ne .Precip "0.00"}} has-precip{{end}}">{{.Precip}}"</td>
+            <td class="num wind">{{.Wind}} mph</td>
+            <td class="cond">{{.Condition}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {{end}}
+
+  {{if .Precip}}
+  <section class="section">
+    <div class="precip-header">
+      <h2>Precipitation</h2>
+      <span class="precip-total">7-day total: {{.TotalPrecip}}"</span>
+    </div>
+    <div class="table-wrap">
+      <table class="precip-table">
+        <thead>
+          <tr>
+            <th></th>
+            {{range .Precip}}
+            <th>{{.Day}}</th>
+            {{end}}
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="precip-bars-row">
+            <td class="row-label">Daily</td>
+            {{range .Precip}}
+            <td class="precip-bar-cell">
+              {{if gt .BarHeight 0.0}}<div class="micro-bar" style="height:{{.BarHeight}}px"></div>{{end}}
+              <span class="{{if gt .DailyVal 0.0}}has-precip{{end}}">{{.Daily}}"</span>
+            </td>
+            {{end}}
+          </tr>
+          <tr class="precip-cumul-row">
+            <td class="row-label">Accum</td>
+            {{range .Precip}}
+            <td class="cumul-val">{{.Cumulative}}"</td>
+            {{end}}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {{end}}
+</div>
+{{end}}
