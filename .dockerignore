@@ -1,0 +1,7 @@
+.git
+.claude
+.playwright-cli
+.playwright-mcp
+*.png
+*.yaml
+*.md

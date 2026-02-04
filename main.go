@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"net/url"
 	"strings"
 	"time"
@@ -421,7 +422,11 @@ func main() {
 	http.HandleFunc("/search", handleSearch)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
-	addr := ":8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := ":" + port
 	log.Printf("Weather server starting on http://localhost%s", addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

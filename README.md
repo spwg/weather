@@ -19,13 +19,28 @@ Minimal, information-dense weather dashboard. Go backend (stdlib only), htmx fro
 - **Frontend:** [htmx](https://htmx.org/) for HTML fragment swapping, pure CSS dark theme
 - **API:** [Open-Meteo](https://open-meteo.com/) — free, no API key required
 
-## Running
+## Live
+
+**https://wx-weather.fly.dev**
+
+## Running locally
 
 ```
 go run main.go
 ```
 
 Open http://localhost:8080
+
+## Deploying
+
+Hosted on [Fly.io](https://fly.io/) using the included `Dockerfile` and `fly.toml`.
+
+```
+fly auth login
+fly deploy
+```
+
+The app reads `PORT` from the environment (defaults to 8080). Fly machines auto-stop when idle and wake on incoming requests.
 
 ## How it works
 
@@ -46,6 +61,8 @@ All data transforms (zipping parallel arrays, computing temperature bar percenta
 ```
 main.go              Server, routes, API calls, data transforms
 go.mod               Module file (no external deps)
+Dockerfile           Multi-stage build (compile + alpine runtime)
+fly.toml             Fly.io deployment config
 templates/
   base.html          Page shell: htmx script, search input, geolocation JS
   forecast.html      Hourly table + daily forecast with range bars + precipitation
