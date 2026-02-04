@@ -121,6 +121,21 @@ type ErrorData struct {
 	Message string
 }
 
+type NominatimResult struct {
+	Name    string `json:"name"`
+	Address struct {
+		City    string `json:"city"`
+		Town    string `json:"town"`
+		Village string `json:"village"`
+	} `json:"address"`
+}
+
+type NearbyData struct {
+	Results []SearchResult
+	Lat     string
+	Lon     string
+}
+
 var templates *template.Template
 
 var wmoDescriptions = map[int]string{
@@ -189,6 +204,64 @@ func fetchGeocode(query string) (*GeocodeResponse, error) {
 		return nil, err
 	}
 	return &data, nil
+}
+
+func reverseGeocode(lat, lon string) (string, error) {
+	apiURL := fmt.Sprintf(
+		"https://nominatim.openstreetmap.org/reverse?lat=%s&lon=%s&format=json&zoom=10",
+		url.QueryEscape(lat), url.QueryEscape(lon),
+	)
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "WX-Weather-App/1.0")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("nominatim request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result NominatimResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	name := result.Address.City
+	if name == "" {
+		name = result.Address.Town
+	}
+	if name == "" {
+		name = result.Address.Village
+	}
+	if name == "" {
+		name = result.Name
+	}
+	return name, nil
+}
+
+func geocodeToSearchResults(results []GeocodeResult) []SearchResult {
+	var out []SearchResult
+	for _, r := range results {
+		detail := r.Country
+		if r.Admin1 != "" {
+			detail = r.Admin1 + ", " + r.Country
+		}
+		fullName := r.Name
+		if r.Admin1 != "" {
+			fullName = r.Name + ", " + r.Admin1
+		}
+		out = append(out, SearchResult{
+			Name:     r.Name,
+			Detail:   detail,
+			Lat:      fmt.Sprintf("%.4f", r.Latitude),
+			Lon:      fmt.Sprintf("%.4f", r.Longitude),
+			FullName: fullName,
+		})
+	}
+	return out
 }
 
 func transformHourly(data *ForecastResponse) []HourlyRow {
@@ -388,26 +461,38 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var results []SearchResult
-	for _, r := range data.Results {
-		detail := r.Country
-		if r.Admin1 != "" {
-			detail = r.Admin1 + ", " + r.Country
-		}
-		fullName := r.Name
-		if r.Admin1 != "" {
-			fullName = r.Name + ", " + r.Admin1
-		}
-		results = append(results, SearchResult{
-			Name:     r.Name,
-			Detail:   detail,
-			Lat:      fmt.Sprintf("%.4f", r.Latitude),
-			Lon:      fmt.Sprintf("%.4f", r.Longitude),
-			FullName: fullName,
-		})
+	templates.ExecuteTemplate(w, "search.html", SearchData{
+		Results: geocodeToSearchResults(data.Results),
+		Query:   q,
+	})
+}
+
+func handleNearby(w http.ResponseWriter, r *http.Request) {
+	lat := r.URL.Query().Get("lat")
+	lon := r.URL.Query().Get("lon")
+	if lat == "" || lon == "" {
+		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Missing coordinates"})
+		return
 	}
 
-	templates.ExecuteTemplate(w, "search.html", SearchData{Results: results, Query: q})
+	cityName, err := reverseGeocode(lat, lon)
+	if err != nil || cityName == "" {
+		log.Printf("reverse geocode failed: %v", err)
+		handleForecast(w, r)
+		return
+	}
+
+	data, err := fetchGeocode(cityName)
+	if err != nil || len(data.Results) == 0 {
+		handleForecast(w, r)
+		return
+	}
+
+	templates.ExecuteTemplate(w, "nearby.html", NearbyData{
+		Results: geocodeToSearchResults(data.Results),
+		Lat:     lat,
+		Lon:     lon,
+	})
 }
 
 func main() {
@@ -420,6 +505,7 @@ func main() {
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/forecast", handleForecast)
 	http.HandleFunc("/search", handleSearch)
+	http.HandleFunc("/nearby", handleNearby)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	port := os.Getenv("PORT")

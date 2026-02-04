@@ -107,7 +107,8 @@ h1 {
   border-bottom: none;
 }
 
-.search-results-list li:hover {
+.search-results-list li:hover,
+.search-results-list li.search-active {
   background: var(--hover);
 }
 
@@ -446,6 +447,74 @@ tbody tr:last-child td {
 
 .precip-bars-row td span {
   font-size: 12px;
+}
+
+/* Nearby city picker */
+.nearby-picker {
+  padding: 20px 0;
+}
+
+.nearby-prompt {
+  color: var(--fg-dim);
+  margin-bottom: 12px;
+}
+
+.nearby-list {
+  list-style: none;
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.nearby-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.nearby-item:last-child {
+  border-bottom: none;
+}
+
+.nearby-item:hover {
+  background: var(--hover);
+}
+
+.nearby-exact {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.nearby-exact:hover {
+  color: var(--fg);
+  border-color: var(--fg-dim);
+}
+
+/* Footer */
+.site-footer {
+  margin-top: 40px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+
+.site-footer a {
+  color: var(--fg-dim);
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: var(--accent);
 }
 
 /* Responsive */

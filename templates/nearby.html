@@ -1,0 +1,23 @@
+{{define "nearby.html"}}
+<div class="nearby-picker">
+  <h2>Nearby Cities</h2>
+  <p class="nearby-prompt">Select a city for your forecast:</p>
+  <ul class="nearby-list">
+    {{range .Results}}
+    <li class="nearby-item"
+        hx-get="/forecast?lat={{.Lat}}&lon={{.Lon}}&name={{.FullName}}"
+        hx-target="#forecast-container"
+        hx-on::after-request="setHash('{{.Lat}}','{{.Lon}}','{{.FullName}}');document.getElementById('search-input').value='{{.FullName}}';">
+      <span class="result-name">{{.Name}}</span>
+      <span class="result-detail">{{.Detail}}</span>
+    </li>
+    {{end}}
+  </ul>
+  <button class="nearby-exact"
+          hx-get="/forecast?lat={{.Lat}}&lon={{.Lon}}"
+          hx-target="#forecast-container"
+          hx-on::after-request="setHash('{{.Lat}}','{{.Lon}}','');">
+    Use exact coordinates ({{.Lat}}, {{.Lon}})
+  </button>
+</div>
+{{end}}

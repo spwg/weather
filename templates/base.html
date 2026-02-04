@@ -33,6 +33,11 @@
     </div>
   </main>
 
+  <footer class="site-footer">
+    <span>Built by <a href="https://spencergreene.com">Spencer Greene</a></span>
+    <span><a href="https://github.com/spwg/weather">Source</a></span>
+  </footer>
+
   <script>
     // --- Hash state helpers ---
 
@@ -66,6 +71,28 @@
       var url = '/forecast?lat=' + lat + '&lon=' + lon;
       if (name) url += '&name=' + encodeURIComponent(name);
       htmx.ajax('GET', url, { target: '#forecast-container' });
+    }
+
+    // --- Search keyboard navigation ---
+
+    var searchActiveIndex = -1;
+
+    function getSearchItems() {
+      return document.querySelectorAll('#search-results .search-results-list li');
+    }
+
+    function updateSearchHighlight() {
+      var items = getSearchItems();
+      for (var i = 0; i < items.length; i++) {
+        if (i === searchActiveIndex) {
+          items[i].classList.add('search-active');
+        } else {
+          items[i].classList.remove('search-active');
+        }
+      }
+      if (searchActiveIndex >= 0 && items[searchActiveIndex]) {
+        items[searchActiveIndex].scrollIntoView({ block: 'nearest' });
+      }
     }
 
     // --- Favorites localStorage API ---
@@ -183,6 +210,9 @@
         updateStarState();
         renderFavorites();
       }
+      if (e.detail.target.id === 'search-results') {
+        searchActiveIndex = -1;
+      }
     });
 
     // --- Back/forward navigation ---
@@ -211,8 +241,7 @@
           function(pos) {
             var lat = pos.coords.latitude.toFixed(4);
             var lon = pos.coords.longitude.toFixed(4);
-            setHash(lat, lon, '', true);
-            loadLocation(lat, lon, '');
+            htmx.ajax('GET', '/nearby?lat=' + lat + '&lon=' + lon, {target: '#forecast-container'});
           },
           function() {
             document.getElementById('forecast-container').innerHTML =
@@ -237,6 +266,27 @@
         if (e.key === 'Escape') {
           document.getElementById('search-results').innerHTML = '';
           document.getElementById('search-input').blur();
+        }
+      });
+
+      // Arrow key navigation for search results
+      document.getElementById('search-input').addEventListener('keydown', function(e) {
+        var items = getSearchItems();
+        if (items.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          searchActiveIndex = (searchActiveIndex + 1) % items.length;
+          updateSearchHighlight();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          searchActiveIndex = (searchActiveIndex - 1 + items.length) % items.length;
+          updateSearchHighlight();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (searchActiveIndex >= 0 && items[searchActiveIndex]) {
+            items[searchActiveIndex].click();
+          }
         }
       });
     });
