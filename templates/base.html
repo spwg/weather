@@ -45,6 +45,9 @@
       var hash = window.location.hash.substring(1);
       if (!hash) return null;
       var p = new URLSearchParams(hash);
+      if (p.has('nearby')) {
+        return { nearby: true, lat: p.get('lat'), lon: p.get('lon') };
+      }
       var lat = p.get('lat');
       var lon = p.get('lon');
       if (!lat || !lon) return null;
@@ -219,7 +222,10 @@
 
     window.addEventListener('popstate', function() {
       var loc = parseHash();
-      if (loc) {
+      if (!loc) return;
+      if (loc.nearby) {
+        htmx.ajax('GET', '/nearby?lat=' + loc.lat + '&lon=' + loc.lon, {target: '#forecast-container'});
+      } else {
         loadLocation(loc.lat, loc.lon, loc.name);
         document.getElementById('search-input').value = loc.name;
       }
@@ -242,6 +248,7 @@
             var lat = pos.coords.latitude.toFixed(4);
             var lon = pos.coords.longitude.toFixed(4);
             htmx.ajax('GET', '/nearby?lat=' + lat + '&lon=' + lon, {target: '#forecast-container'});
+            history.replaceState({nearby: true}, '', '#nearby&lat=' + lat + '&lon=' + lon);
           },
           function() {
             document.getElementById('forecast-container').innerHTML =

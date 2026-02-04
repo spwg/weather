@@ -7,7 +7,7 @@
     <li class="nearby-item"
         hx-get="/forecast?lat={{.Lat}}&lon={{.Lon}}&name={{.FullName}}"
         hx-target="#forecast-container"
-        hx-on::after-request="setHash('{{.Lat}}','{{.Lon}}','{{.FullName}}');document.getElementById('search-input').value='{{.FullName}}';">
+        onclick="setHash('{{.Lat}}','{{.Lon}}','{{.FullName}}');document.getElementById('search-input').value='{{.FullName}}';">
       <span class="result-name">{{.Name}}</span>
       <span class="result-detail">{{.Detail}}</span>
     </li>
@@ -16,7 +16,7 @@
   <button class="nearby-exact"
           hx-get="/forecast?lat={{.Lat}}&lon={{.Lon}}"
           hx-target="#forecast-container"
-          hx-on::after-request="setHash('{{.Lat}}','{{.Lon}}','');">
+          onclick="setHash('{{.Lat}}','{{.Lon}}','');">
     Use exact coordinates ({{.Lat}}, {{.Lon}})
   </button>
 </div>

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"net/url"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -240,6 +242,16 @@ func reverseGeocode(lat, lon string) (string, error) {
 		name = result.Name
 	}
 	return name, nil
+}
+
+func haversine(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371 // Earth radius in km
+	dLat := (lat2 - lat1) * math.Pi / 180
+	dLon := (lon2 - lon1) * math.Pi / 180
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
+			math.Sin(dLon/2)*math.Sin(dLon/2)
+	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 }
 
 func geocodeToSearchResults(results []GeocodeResult) []SearchResult {
@@ -488,8 +500,39 @@ func handleNearby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userLat, err1 := strconv.ParseFloat(lat, 64)
+	userLon, err2 := strconv.ParseFloat(lon, 64)
+	if err1 != nil || err2 != nil {
+		handleForecast(w, r)
+		return
+	}
+
+	// Filter to cities within 200km and sort by distance
+	type resultWithDist struct {
+		result GeocodeResult
+		dist   float64
+	}
+	var nearby []resultWithDist
+	for _, r := range data.Results {
+		d := haversine(userLat, userLon, r.Latitude, r.Longitude)
+		if d <= 200 {
+			nearby = append(nearby, resultWithDist{r, d})
+		}
+	}
+	sort.Slice(nearby, func(i, j int) bool { return nearby[i].dist < nearby[j].dist })
+
+	if len(nearby) == 0 {
+		handleForecast(w, r)
+		return
+	}
+
+	var filtered []GeocodeResult
+	for _, n := range nearby {
+		filtered = append(filtered, n.result)
+	}
+
 	templates.ExecuteTemplate(w, "nearby.html", NearbyData{
-		Results: geocodeToSearchResults(data.Results),
+		Results: geocodeToSearchResults(filtered),
 		Lat:     lat,
 		Lon:     lon,
 	})
