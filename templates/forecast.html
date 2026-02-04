@@ -81,11 +81,11 @@
             <td class="day-col">{{.Date}}</td>
             <td class="bar-cell">
               <div class="temp-bar-row">
-                <span class="temp-low">{{.Low}}°</span>
+                <span class="temp-low" style="color:{{.LowColor}}">{{.Low}}°</span>
                 <div class="temp-bar-track">
-                  <div class="temp-bar-fill" style="left:{{.BarLeft}}%;width:{{.BarWidth}}%"></div>
+                  <div class="temp-bar-fill" style="left:{{.BarLeft}}%;width:{{.BarWidth}}%;background:linear-gradient(to right,{{.LowColor}},{{.HighColor}})"></div>
                 </div>
-                <span class="temp-high">{{.High}}°</span>
+                <span class="temp-high" style="color:{{.HighColor}}">{{.High}}°</span>
               </div>
             </td>
             <td class="num precip{{if ne .Precip "0.00"}} has-precip{{end}}">{{.Precip}}"</td>

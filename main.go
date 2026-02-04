@@ -75,6 +75,8 @@ type DailyRow struct {
 	High      int
 	BarLeft   float64
 	BarWidth  float64
+	LowColor  string
+	HighColor string
 	Precip    string
 	Wind      int
 	Condition string
@@ -308,6 +310,47 @@ func transformHourly(data *ForecastResponse) []HourlyRow {
 	return rows
 }
 
+// tempColor returns a hex color for an absolute temperature (°F).
+// Uses fixed color stops so cold temps are always blue and hot temps are always red.
+func tempColor(f float64) string {
+	type stop struct {
+		temp    float64
+		r, g, b float64
+	}
+	stops := []stop{
+		{-10, 0x8b, 0x5c, 0xf6}, // purple
+		{10, 0x6d, 0x8e, 0xff},   // blue-purple
+		{25, 0x4a, 0x9e, 0xff},   // blue
+		{35, 0x4a, 0xd4, 0xf0},   // light blue
+		{45, 0x4a, 0xd0, 0xa0},   // teal
+		{55, 0x8c, 0xc6, 0x3f},   // green
+		{65, 0xf0, 0xc8, 0x30},   // yellow
+		{75, 0xff, 0x8c, 0x20},   // orange
+		{85, 0xff, 0x4d, 0x2e},   // red-orange
+		{100, 0xd4, 0x10, 0x2a},  // deep red
+	}
+
+	if f <= stops[0].temp {
+		return fmt.Sprintf("#%02x%02x%02x", int(stops[0].r), int(stops[0].g), int(stops[0].b))
+	}
+	if f >= stops[len(stops)-1].temp {
+		s := stops[len(stops)-1]
+		return fmt.Sprintf("#%02x%02x%02x", int(s.r), int(s.g), int(s.b))
+	}
+
+	for i := 1; i < len(stops); i++ {
+		if f <= stops[i].temp {
+			t := (f - stops[i-1].temp) / (stops[i].temp - stops[i-1].temp)
+			r := stops[i-1].r + t*(stops[i].r-stops[i-1].r)
+			g := stops[i-1].g + t*(stops[i].g-stops[i-1].g)
+			b := stops[i-1].b + t*(stops[i].b-stops[i-1].b)
+			return fmt.Sprintf("#%02x%02x%02x", int(r), int(g), int(b))
+		}
+	}
+	s := stops[len(stops)-1]
+	return fmt.Sprintf("#%02x%02x%02x", int(s.r), int(s.g), int(s.b))
+}
+
 func transformDaily(data *ForecastResponse) ([]DailyRow, int, int) {
 	loc, err := time.LoadLocation(data.Timezone)
 	if err != nil {
@@ -353,6 +396,8 @@ func transformDaily(data *ForecastResponse) ([]DailyRow, int, int) {
 			High:      int(math.Round(high)),
 			BarLeft:   math.Round(barLeft*10) / 10,
 			BarWidth:  math.Round(barWidth*10) / 10,
+			LowColor:  tempColor(low),
+			HighColor: tempColor(high),
 			Precip:    fmt.Sprintf("%.2f", data.Daily.PrecipSum[i]),
 			Wind:      int(math.Round(data.Daily.WindSpeedMax[i])),
 			Condition: wmoDescription(data.Daily.WeatherCode[i]),
