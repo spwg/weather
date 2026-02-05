@@ -73,6 +73,8 @@ type DailyRow struct {
 	Date      string
 	Low       int
 	High      int
+	LowColor  string
+	HighColor string
 	BarLeft   float64
 	BarWidth  float64
 	Precip    string
@@ -164,6 +166,43 @@ func windDirLabel(degrees float64) string {
 		"S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}
 	ix := int(math.Round(degrees/22.5)) % 16
 	return dirs[ix]
+}
+
+// tempToColor maps a temperature (Fahrenheit) to a hex color string.
+// Color scale: Blue (cold) → White (mild) → Yellow → Orange → Red (hot)
+func tempToColor(temp float64) string {
+	type colorStop struct {
+		temp float64
+		r, g, b uint8
+	}
+	stops := []colorStop{
+		{20, 0x4a, 0x9e, 0xff},  // Blue - cold
+		{45, 0xe0, 0xe0, 0xe0},  // White - mild
+		{65, 0xff, 0xd9, 0x3d},  // Yellow - warm
+		{80, 0xff, 0x6b, 0x35},  // Orange - hot
+		{95, 0xff, 0x33, 0x33},  // Red - very hot
+	}
+
+	// Clamp to range
+	if temp <= stops[0].temp {
+		return fmt.Sprintf("#%02x%02x%02x", stops[0].r, stops[0].g, stops[0].b)
+	}
+	if temp >= stops[len(stops)-1].temp {
+		s := stops[len(stops)-1]
+		return fmt.Sprintf("#%02x%02x%02x", s.r, s.g, s.b)
+	}
+
+	// Find the two stops to interpolate between
+	for i := 0; i < len(stops)-1; i++ {
+		if temp >= stops[i].temp && temp <= stops[i+1].temp {
+			t := (temp - stops[i].temp) / (stops[i+1].temp - stops[i].temp)
+			r := uint8(float64(stops[i].r) + t*(float64(stops[i+1].r)-float64(stops[i].r)))
+			g := uint8(float64(stops[i].g) + t*(float64(stops[i+1].g)-float64(stops[i].g)))
+			b := uint8(float64(stops[i].b) + t*(float64(stops[i+1].b)-float64(stops[i].b)))
+			return fmt.Sprintf("#%02x%02x%02x", r, g, b)
+		}
+	}
+	return "#e0e0e0" // fallback
 }
 
 func fetchJSON(apiURL string, target any) error {
@@ -351,6 +390,8 @@ func transformDaily(data *ForecastResponse) ([]DailyRow, int, int) {
 			Date:      t.Format("Mon 01/02"),
 			Low:       int(math.Round(low)),
 			High:      int(math.Round(high)),
+			LowColor:  tempToColor(low),
+			HighColor: tempToColor(high),
 			BarLeft:   math.Round(barLeft*10) / 10,
 			BarWidth:  math.Round(barWidth*10) / 10,
 			Precip:    fmt.Sprintf("%.2f", data.Daily.PrecipSum[i]),
