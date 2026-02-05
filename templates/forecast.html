@@ -77,7 +77,10 @@
         </thead>
         <tbody>
           {{range .Days}}
-          <tr{{if .IsToday}} class="row-now"{{end}}>
+          <tr class="daily-row{{if .IsToday}} row-now{{end}}"
+              hx-get="/day-forecast?lat={{$.Lat}}&lon={{$.Lon}}&name={{$.Name}}&day={{.DateISO}}"
+              hx-target="#forecast-container"
+              onclick="setHashWithDay('{{$.Lat}}','{{$.Lon}}','{{$.Name}}','{{.DateISO}}')">
             <td class="day-col">{{.Date}}</td>
             <td class="bar-cell">
               <div class="temp-bar-row">

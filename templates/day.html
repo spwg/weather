@@ -1,0 +1,83 @@
+{{define "day.html"}}
+<div class="day-forecast">
+  <div class="day-header">
+    <a href="#" class="back-link" onclick="loadForecastFromDay();return false;">7-Day Forecast</a>
+    <span class="location-name">{{.Name}}</span>
+  </div>
+
+  <section class="section day-overview">
+    <h2>{{.Date}}</h2>
+    <div class="day-summary">
+      <div class="day-temps">
+        <div class="temp-bar-row">
+          <span class="temp-low" data-temp-f="{{.Summary.Low}}" style="color:{{.Summary.LowColor}}">{{.Summary.Low}}°</span>
+          <div class="temp-bar-track day-bar-track">
+            <div class="temp-bar-fill" style="left:0%;width:100%;background:linear-gradient(to right,{{.Summary.LowColor}},{{.Summary.HighColor}})"></div>
+          </div>
+          <span class="temp-high" data-temp-f="{{.Summary.High}}" style="color:{{.Summary.HighColor}}">{{.Summary.High}}°</span>
+        </div>
+      </div>
+      <div class="day-details">
+        <span class="day-detail"><strong>Precip:</strong> <span{{if ge .Summary.PrecipRaw 0.0}} data-precip-in="{{.Summary.PrecipRaw}}"{{end}}>{{.Summary.Precip}}</span></span>
+        <span class="day-detail"><strong>Wind:</strong> {{.Summary.Wind}} mph</span>
+        <span class="day-detail"><strong>Conditions:</strong> {{.Summary.Condition}}</span>
+      </div>
+    </div>
+  </section>
+
+  {{if .Hours}}
+  <section class="section">
+    <h2>Hourly</h2>
+    <div class="table-wrap">
+      <table class="hourly-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th class="num">Temp</th>
+            <th class="num">Feels</th>
+            <th class="num">Precip</th>
+            <th class="num">Wind</th>
+            <th>Conditions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Hours}}
+          <tr{{if .IsNow}} class="row-now"{{end}}>
+            <td class="time-col">{{.Time}}</td>
+            <td class="num temp" data-temp-f="{{.Temp}}">{{.Temp}}°</td>
+            <td class="num feels" data-temp-f="{{.FeelsLike}}">{{.FeelsLike}}°</td>
+            <td class="num precip{{if gt .PrecipRaw 0.0}} has-precip{{end}}" data-precip-in="{{.PrecipRaw}}">{{.Precip}}</td>
+            <td class="num wind">{{.WindSpeed}} {{.WindDir}}</td>
+            <td class="cond">{{.Condition}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {{else}}
+  <section class="section">
+    <p class="no-data">Hourly forecast data not available for this day.</p>
+  </section>
+  {{end}}
+
+  <div class="day-nav">
+    {{if .PrevDay}}
+    <a href="#" class="day-nav-link prev"
+       hx-get="/day-forecast?lat={{.Lat}}&lon={{.Lon}}&name={{.Name}}&day={{.PrevDay}}"
+       hx-target="#forecast-container"
+       onclick="setHashWithDay('{{.Lat}}','{{.Lon}}','{{.Name}}','{{.PrevDay}}')">&larr; Previous Day</a>
+    {{else}}
+    <span class="day-nav-link disabled"></span>
+    {{end}}
+    {{if .NextDay}}
+    <a href="#" class="day-nav-link next"
+       hx-get="/day-forecast?lat={{.Lat}}&lon={{.Lon}}&name={{.Name}}&day={{.NextDay}}"
+       hx-target="#forecast-container"
+       onclick="setHashWithDay('{{.Lat}}','{{.Lon}}','{{.Name}}','{{.NextDay}}')">Next Day &rarr;</a>
+    {{else}}
+    <span class="day-nav-link disabled"></span>
+    {{end}}
+  </div>
+</div>
+{{end}}

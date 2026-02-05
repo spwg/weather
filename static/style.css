@@ -537,6 +537,111 @@ tbody tr:last-child td {
   color: var(--accent);
 }
 
+/* Clickable daily rows */
+.daily-row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.daily-row:hover {
+  background: var(--hover);
+}
+
+.daily-row:hover td:first-child {
+  box-shadow: inset 2px 0 0 var(--fg-dim);
+}
+
+.daily-row.row-now:hover td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Day detail view */
+.day-forecast {
+  animation: fadeIn 0.15s ease-in;
+}
+
+.day-header {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.back-link {
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.back-link:hover {
+  color: var(--accent);
+}
+
+.day-overview h2 {
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.day-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.day-temps {
+  max-width: 300px;
+}
+
+.day-bar-track {
+  min-width: 120px;
+}
+
+.day-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.day-detail {
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+
+.day-detail strong {
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+
+.day-nav {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+}
+
+.day-nav-link {
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.day-nav-link:hover {
+  color: var(--accent);
+}
+
+.day-nav-link.disabled {
+  visibility: hidden;
+}
+
+.no-data {
+  color: var(--fg-dim);
+  font-style: italic;
+  padding: 20px 0;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   body {

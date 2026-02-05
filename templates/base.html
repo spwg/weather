@@ -55,7 +55,7 @@
       var lat = p.get('lat');
       var lon = p.get('lon');
       if (!lat || !lon) return null;
-      return { lat: lat, lon: lon, name: p.get('name') || '' };
+      return { lat: lat, lon: lon, name: p.get('name') || '', day: p.get('day') || '' };
     }
 
     function buildHash(lat, lon, name) {
@@ -72,6 +72,29 @@
       } else {
         history.pushState(state, '', hash);
       }
+    }
+
+    function setHashWithDay(lat, lon, name, day) {
+      var h = 'lat=' + lat + '&lon=' + lon;
+      if (name) h += '&name=' + encodeURIComponent(name);
+      if (day) h += '&day=' + day;
+      var hash = '#' + h;
+      var state = { lat: lat, lon: lon, name: name, day: day };
+      history.pushState(state, '', hash);
+    }
+
+    function loadDayForecast(lat, lon, name, day) {
+      var url = '/day-forecast?lat=' + lat + '&lon=' + lon + '&day=' + day;
+      if (name) url += '&name=' + encodeURIComponent(name);
+      htmx.ajax('GET', url, { target: '#forecast-container' });
+    }
+
+    function loadForecastFromDay() {
+      var loc = parseHash();
+      if (!loc) return;
+      // Remove day from hash and load the 7-day forecast
+      setHash(loc.lat, loc.lon, loc.name);
+      loadLocation(loc.lat, loc.lon, loc.name);
     }
 
     function loadLocation(lat, lon, name) {
@@ -267,14 +290,14 @@
         }
       });
 
-      // Update toggle button labels
+      // Update toggle button labels to show what you'll switch TO
       var tempToggle = document.getElementById('temp-unit-toggle');
       var precipToggle = document.getElementById('precip-unit-toggle');
       if (tempToggle) {
-        tempToggle.textContent = tempUnit === 'c' ? '°C' : '°F';
+        tempToggle.textContent = tempUnit === 'c' ? '°F' : '°C';
       }
       if (precipToggle) {
-        precipToggle.textContent = precipUnit === 'mm' ? 'mm' : 'in';
+        precipToggle.textContent = precipUnit === 'mm' ? 'in' : 'mm';
       }
     }
 
@@ -331,6 +354,9 @@
       if (!loc) return;
       if (loc.nearby) {
         htmx.ajax('GET', '/nearby?lat=' + loc.lat + '&lon=' + loc.lon, {target: '#forecast-container'});
+      } else if (loc.day) {
+        loadDayForecast(loc.lat, loc.lon, loc.name, loc.day);
+        document.getElementById('search-input').value = loc.name;
       } else {
         loadLocation(loc.lat, loc.lon, loc.name);
         document.getElementById('search-input').value = loc.name;
@@ -345,7 +371,11 @@
 
       var hashLoc = parseHash();
       if (hashLoc) {
-        loadLocation(hashLoc.lat, hashLoc.lon, hashLoc.name);
+        if (hashLoc.day) {
+          loadDayForecast(hashLoc.lat, hashLoc.lon, hashLoc.name, hashLoc.day);
+        } else {
+          loadLocation(hashLoc.lat, hashLoc.lon, hashLoc.name);
+        }
         if (hashLoc.name) {
           document.getElementById('search-input').value = hashLoc.name;
         }

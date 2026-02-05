@@ -119,6 +119,7 @@ type HourlyRow struct {
 
 type DailyRow struct {
 	Date      string
+	DateISO   string // YYYY-MM-DD format for URL state
 	Low       int
 	High      int
 	LowColor  string
@@ -156,6 +157,20 @@ type ForecastData struct {
 	TotalPrecipRaw float64 // raw total in inches, -1 if not applicable
 	GlobalLow      int
 	GlobalHigh     int
+}
+
+type DayForecastData struct {
+	Name      string
+	Lat       string
+	Lon       string
+	Timezone  string
+	Date      string      // "Wednesday, February 5"
+	DateShort string      // "Wed 02/05"
+	DateISO   string      // "2026-02-05"
+	Summary   DailyRow    // Day overview
+	Hours     []HourlyRow // All hours for this day
+	PrevDay   string      // Previous day ISO date (empty if none)
+	NextDay   string      // Next day ISO date (empty if none)
 }
 
 type SearchData struct {
@@ -506,6 +521,7 @@ func transformDaily(data *ForecastResponse) ([]DailyRow, int, int) {
 
 		rows = append(rows, DailyRow{
 			Date:      t.Format("Mon 01/02"),
+			DateISO:   dateStr,
 			Low:       int(math.Round(low)),
 			High:      int(math.Round(high)),
 			LowColor:  tempToColor(low),
@@ -700,6 +716,7 @@ func transformNWSDaily(periods []NWSPeriod, timezone string) ([]DailyRow, int, i
 
 		rows = append(rows, DailyRow{
 			Date:      t.Format("Mon 01/02"),
+			DateISO:   dateStr,
 			Low:       low,
 			High:      high,
 			LowColor:  tempToColor(float64(low)),
@@ -793,6 +810,48 @@ func aggregateNWSPrecipByDay(gridData *NWSGridpointResponse, dates []string, tim
 	return dailyPrecip
 }
 
+// distributeQPFToHours takes gridpoint QPF data and returns hourly precip in inches for a specific date
+func distributeQPFToHours(gridData *NWSGridpointResponse, targetDate string, timezone string) map[int]float64 {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	hourlyPrecip := make(map[int]float64)
+
+	for _, v := range gridData.Properties.QuantitativePrecipitation.Values {
+		if v.Value == nil || *v.Value == 0 {
+			continue
+		}
+
+		parts := strings.Split(v.ValidTime, "/")
+		if len(parts) != 2 {
+			continue
+		}
+
+		startTime, err := time.Parse(time.RFC3339, parts[0])
+		if err != nil {
+			continue
+		}
+		startTime = startTime.In(loc)
+		hours := parseISO8601Duration(parts[1])
+		if hours <= 0 {
+			hours = 1
+		}
+
+		precipPerHour := (*v.Value / 25.4) / float64(hours) // mm to inches, distributed
+
+		for h := 0; h < hours; h++ {
+			t := startTime.Add(time.Duration(h) * time.Hour)
+			if t.Format("2006-01-02") == targetDate {
+				hourlyPrecip[t.Hour()] += precipPerHour
+			}
+		}
+	}
+
+	return hourlyPrecip
+}
+
 func calcNWSPrecipWithQPF(days []DailyRow, precipByDay map[string]float64, timezone string) ([]PrecipEntry, string) {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
@@ -884,6 +943,265 @@ func calcNWSPrecip(days []DailyRow) ([]PrecipEntry, string) {
 		})
 	}
 	return entries, fmt.Sprintf("%d%% max", maxPrecip)
+}
+
+// transformHourlyForDay filters Open-Meteo hourly data to a specific date
+func transformHourlyForDay(data *ForecastResponse, targetDate string) []HourlyRow {
+	loc, err := time.LoadLocation(data.Timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	now := time.Now().In(loc)
+	today := now.Format("2006-01-02")
+
+	var rows []HourlyRow
+	for i, ts := range data.Hourly.Time {
+		t, err := time.ParseInLocation("2006-01-02T15:04", ts, loc)
+		if err != nil {
+			continue
+		}
+		dateStr := t.Format("2006-01-02")
+		if dateStr != targetDate {
+			continue
+		}
+		// Skip past hours for today
+		if dateStr == today && t.Before(now.Truncate(time.Hour)) {
+			continue
+		}
+		rows = append(rows, HourlyRow{
+			Time:      t.Format("3 PM"),
+			Temp:      int(math.Round(data.Hourly.Temperature[i])),
+			FeelsLike: int(math.Round(data.Hourly.ApparentTemp[i])),
+			Precip:    fmt.Sprintf("%.2f\"", data.Hourly.Precipitation[i]),
+			PrecipRaw: data.Hourly.Precipitation[i],
+			WindSpeed: int(math.Round(data.Hourly.WindSpeed[i])),
+			WindDir:   windDirLabel(data.Hourly.WindDirection[i]),
+			Condition: wmoDescription(data.Hourly.WeatherCode[i]),
+			IsNow:     dateStr == today && t.Hour() == now.Hour(),
+		})
+	}
+	return rows
+}
+
+// transformNWSHourlyForDay filters NWS hourly periods to a specific date
+func transformNWSHourlyForDay(periods []NWSPeriod, timezone string, targetDate string) []HourlyRow {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	now := time.Now().In(loc)
+	today := now.Format("2006-01-02")
+
+	var rows []HourlyRow
+	for _, p := range periods {
+		t, err := time.Parse(time.RFC3339, p.StartTime)
+		if err != nil {
+			continue
+		}
+		t = t.In(loc)
+		dateStr := t.Format("2006-01-02")
+		if dateStr != targetDate {
+			continue
+		}
+		// Skip past hours for today
+		if dateStr == today && t.Before(now.Truncate(time.Hour)) {
+			continue
+		}
+
+		windSpeed := parseWindSpeed(p.WindSpeed)
+		precip := "0%"
+		if p.ProbabilityOfPrecipitation.Value != nil {
+			precip = fmt.Sprintf("%d%%", *p.ProbabilityOfPrecipitation.Value)
+		}
+		rows = append(rows, HourlyRow{
+			Time:      t.Format("3 PM"),
+			Temp:      p.Temperature,
+			FeelsLike: windchill(float64(p.Temperature), windSpeed),
+			Precip:    precip,
+			PrecipRaw: -1, // NWS hourly uses probability, not amount
+			WindSpeed: int(math.Round(windSpeed)),
+			WindDir:   p.WindDirection,
+			Condition: p.ShortForecast,
+			IsNow:     dateStr == today && t.Hour() == now.Hour(),
+		})
+	}
+	return rows
+}
+
+// getDailyRowForDate finds the DailyRow for a specific date
+func getDailyRowForDate(days []DailyRow, targetDate string) *DailyRow {
+	for i := range days {
+		if days[i].DateISO == targetDate {
+			return &days[i]
+		}
+	}
+	return nil
+}
+
+// getAdjacentDates returns prev and next day ISO dates based on available days
+func getAdjacentDates(days []DailyRow, targetDate string) (prev, next string) {
+	for i, d := range days {
+		if d.DateISO == targetDate {
+			if i > 0 {
+				prev = days[i-1].DateISO
+			}
+			if i < len(days)-1 {
+				next = days[i+1].DateISO
+			}
+			return
+		}
+	}
+	return
+}
+
+func handleDayForecast(w http.ResponseWriter, r *http.Request) {
+	lat := r.URL.Query().Get("lat")
+	lon := r.URL.Query().Get("lon")
+	name := r.URL.Query().Get("name")
+	dayParam := r.URL.Query().Get("day")
+
+	if lat == "" || lon == "" || dayParam == "" {
+		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Missing parameters"})
+		return
+	}
+
+	// Parse the target date
+	targetDate, err := time.Parse("2006-01-02", dayParam)
+	if err != nil {
+		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Invalid date format"})
+		return
+	}
+
+	var dfd DayForecastData
+	dfd.Lat = lat
+	dfd.Lon = lon
+	dfd.Name = name
+	dfd.DateISO = dayParam
+	dfd.Date = targetDate.Format("Monday, January 2")
+	dfd.DateShort = targetDate.Format("Mon 01/02")
+
+	// Try NWS API first (for US locations)
+	nwsPoints, err := fetchNWSPoints(lat, lon)
+	if err == nil {
+		// NWS succeeded - this is a US location
+		log.Printf("Using NWS API for day forecast %s,%s day=%s", lat, lon, dayParam)
+
+		// Fetch daily and hourly forecasts
+		daily, err := fetchNWSForecast(nwsPoints.Properties.Forecast)
+		if err != nil {
+			log.Printf("NWS daily forecast error: %v, falling back to Open-Meteo", err)
+			goto openMeteoDayForecast
+		}
+		hourly, err := fetchNWSForecast(nwsPoints.Properties.ForecastHourly)
+		if err != nil {
+			log.Printf("NWS hourly forecast error: %v, falling back to Open-Meteo", err)
+			goto openMeteoDayForecast
+		}
+
+		timezone := nwsPoints.Properties.TimeZone
+		if timezone == "" {
+			timezone = "America/New_York"
+		}
+		dfd.Timezone = timezone
+
+		// Get daily rows for summary and navigation
+		days, _, _ := transformNWSDaily(daily.Properties.Periods, timezone)
+
+		// Update precip with QPF if available
+		gridpoint, err := fetchNWSGridpoint(nwsPoints.Properties.GridId, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
+		if err == nil {
+			loc, _ := time.LoadLocation(timezone)
+			if loc == nil {
+				loc = time.UTC
+			}
+			now := time.Now().In(loc)
+			var dates []string
+			for _, d := range days {
+				t, err := time.ParseInLocation("Mon 01/02", d.Date, loc)
+				if err == nil {
+					t = time.Date(now.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+					dates = append(dates, t.Format("2006-01-02"))
+				}
+			}
+			precipByDay := aggregateNWSPrecipByDay(gridpoint, dates, timezone)
+			for i := range days {
+				if i < len(dates) {
+					days[i].Precip = fmt.Sprintf("%.2f\"", precipByDay[dates[i]])
+					days[i].PrecipRaw = precipByDay[dates[i]]
+				}
+			}
+		}
+
+		// Find the summary for the target day
+		summary := getDailyRowForDate(days, dayParam)
+		if summary == nil {
+			templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Day not found in forecast"})
+			return
+		}
+		dfd.Summary = *summary
+
+		// Get hourly data for this day
+		dfd.Hours = transformNWSHourlyForDay(hourly.Properties.Periods, timezone, dayParam)
+
+		// Overlay QPF precipitation amounts onto hourly rows
+		if gridpoint != nil {
+			hourlyQPF := distributeQPFToHours(gridpoint, dayParam, timezone)
+			for i := range dfd.Hours {
+				t, _ := time.ParseInLocation("3 PM", dfd.Hours[i].Time, time.UTC)
+				precip := hourlyQPF[t.Hour()]
+				dfd.Hours[i].PrecipRaw = precip
+				dfd.Hours[i].Precip = fmt.Sprintf("%.2f\"", precip)
+			}
+		}
+
+		// Get adjacent days for navigation
+		dfd.PrevDay, dfd.NextDay = getAdjacentDates(days, dayParam)
+
+		if name == "" {
+			name = fmt.Sprintf("%.4s, %.4s", lat, lon)
+			dfd.Name = name
+		}
+
+		templates.ExecuteTemplate(w, "day.html", dfd)
+		return
+	}
+
+	log.Printf("NWS points error for day forecast %s,%s: %v, using Open-Meteo", lat, lon, err)
+
+openMeteoDayForecast:
+	// Fallback to Open-Meteo
+	data, err := fetchForecast(lat, lon)
+	if err != nil {
+		log.Printf("Open-Meteo forecast error: %v", err)
+		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Weather data unavailable"})
+		return
+	}
+
+	dfd.Timezone = data.Timezone
+
+	// Get daily rows for summary and navigation
+	days, _, _ := transformDaily(data)
+
+	// Find the summary for the target day
+	summary := getDailyRowForDate(days, dayParam)
+	if summary == nil {
+		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Day not found in forecast"})
+		return
+	}
+	dfd.Summary = *summary
+
+	// Get hourly data for this day
+	dfd.Hours = transformHourlyForDay(data, dayParam)
+
+	// Get adjacent days for navigation
+	dfd.PrevDay, dfd.NextDay = getAdjacentDates(days, dayParam)
+
+	if name == "" {
+		name = fmt.Sprintf("%.2f, %.2f", data.Latitude, data.Longitude)
+		dfd.Name = name
+	}
+
+	templates.ExecuteTemplate(w, "day.html", dfd)
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -1149,6 +1467,7 @@ func main() {
 
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/forecast", handleForecast)
+	http.HandleFunc("/day-forecast", handleDayForecast)
 	http.HandleFunc("/search", handleSearch)
 	http.HandleFunc("/nearby", handleNearby)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
