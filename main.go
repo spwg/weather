@@ -7,10 +7,12 @@ import (
 	"log"
 	"math"
 	"net/http"
-	"os"
 	"net/url"
+	"os"
+	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -63,6 +65,9 @@ type NWSPointsResponse struct {
 		Forecast       string `json:"forecast"`
 		ForecastHourly string `json:"forecastHourly"`
 		TimeZone       string `json:"timeZone"`
+		GridId         string `json:"gridId"`
+		GridX          int    `json:"gridX"`
+		GridY          int    `json:"gridY"`
 	} `json:"properties"`
 }
 
@@ -84,6 +89,18 @@ type NWSPeriod struct {
 	ProbabilityOfPrecipitation struct {
 		Value *int `json:"value"`
 	} `json:"probabilityOfPrecipitation"`
+}
+
+type NWSGridpointResponse struct {
+	Properties struct {
+		QuantitativePrecipitation struct {
+			Uom    string `json:"uom"`
+			Values []struct {
+				ValidTime string   `json:"validTime"`
+				Value     *float64 `json:"value"`
+			} `json:"values"`
+		} `json:"quantitativePrecipitation"`
+	} `json:"properties"`
 }
 
 // View-model structs for templates
@@ -328,6 +345,15 @@ func fetchNWSPoints(lat, lon string) (*NWSPointsResponse, error) {
 func fetchNWSForecast(forecastURL string) (*NWSForecastResponse, error) {
 	var data NWSForecastResponse
 	if err := fetchNWSJSON(forecastURL, &data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func fetchNWSGridpoint(gridId string, gridX, gridY int) (*NWSGridpointResponse, error) {
+	apiURL := fmt.Sprintf("https://api.weather.gov/gridpoints/%s/%d,%d", gridId, gridX, gridY)
+	var data NWSGridpointResponse
+	if err := fetchNWSJSON(apiURL, &data); err != nil {
 		return nil, err
 	}
 	return &data, nil
@@ -686,6 +712,138 @@ func transformNWSDaily(periods []NWSPeriod, timezone string) ([]DailyRow, int, i
 	return rows, int(math.Round(globalMin)), int(math.Round(globalMax))
 }
 
+// parseISO8601Duration parses durations like "PT6H" and returns hours
+func parseISO8601Duration(dur string) int {
+	// Match patterns like PT6H, PT1H, PT12H
+	re := regexp.MustCompile(`PT(\d+)H`)
+	matches := re.FindStringSubmatch(dur)
+	if len(matches) == 2 {
+		hours, _ := strconv.Atoi(matches[1])
+		return hours
+	}
+	return 6 // default to 6 hours
+}
+
+// aggregateNWSPrecipByDay takes gridpoint QPF data and returns daily totals in inches
+// The dates parameter provides the ordered list of dates to aggregate for
+func aggregateNWSPrecipByDay(gridData *NWSGridpointResponse, dates []string, timezone string) map[string]float64 {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	dailyPrecip := make(map[string]float64)
+	for _, dateStr := range dates {
+		dailyPrecip[dateStr] = 0
+	}
+
+	for _, v := range gridData.Properties.QuantitativePrecipitation.Values {
+		if v.Value == nil {
+			continue
+		}
+
+		// Parse validTime like "2026-02-04T12:00:00+00:00/PT6H"
+		parts := strings.Split(v.ValidTime, "/")
+		if len(parts) != 2 {
+			continue
+		}
+
+		startTime, err := time.Parse(time.RFC3339, parts[0])
+		if err != nil {
+			continue
+		}
+		startTime = startTime.In(loc)
+		hours := parseISO8601Duration(parts[1])
+
+		// Distribute precipitation across the hours, attributing to the start day
+		dateStr := startTime.Format("2006-01-02")
+		if _, exists := dailyPrecip[dateStr]; exists {
+			// Convert mm to inches
+			precipInches := *v.Value / 25.4
+			dailyPrecip[dateStr] += precipInches
+		}
+
+		// If the period spans midnight, also add to the next day
+		endTime := startTime.Add(time.Duration(hours) * time.Hour)
+		if endTime.Day() != startTime.Day() {
+			nextDateStr := endTime.Format("2006-01-02")
+			if _, exists := dailyPrecip[nextDateStr]; exists {
+				// Rough approximation: attribute based on hours in each day
+				hoursInFirst := 24 - startTime.Hour()
+				hoursInSecond := hours - hoursInFirst
+				if hoursInSecond > 0 && hours > 0 {
+					precipInches := *v.Value / 25.4
+					// Redistribute: first day gets its portion, second day gets rest
+					dailyPrecip[dateStr] = dailyPrecip[dateStr] - precipInches + (precipInches * float64(hoursInFirst) / float64(hours))
+					dailyPrecip[nextDateStr] += precipInches * float64(hoursInSecond) / float64(hours)
+				}
+			}
+		}
+	}
+
+	return dailyPrecip
+}
+
+func calcNWSPrecipWithQPF(days []DailyRow, precipByDay map[string]float64, timezone string) ([]PrecipEntry, string) {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	var entries []PrecipEntry
+	var total float64
+	var maxDaily float64
+
+	// First pass to find max for bar scaling
+	for _, d := range days {
+		// Parse date from "Mon 01/02" format - need to figure out the year
+		t, err := time.ParseInLocation("Mon 01/02", d.Date, loc)
+		if err != nil {
+			continue
+		}
+		// Set year to current year
+		now := time.Now().In(loc)
+		t = time.Date(now.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+		dateStr := t.Format("2006-01-02")
+
+		precip := precipByDay[dateStr]
+		if precip > maxDaily {
+			maxDaily = precip
+		}
+		total += precip
+	}
+
+	// Second pass to build entries
+	var cumulative float64
+	for _, d := range days {
+		t, err := time.ParseInLocation("Mon 01/02", d.Date, loc)
+		if err != nil {
+			continue
+		}
+		now := time.Now().In(loc)
+		t = time.Date(now.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+		dateStr := t.Format("2006-01-02")
+
+		precip := precipByDay[dateStr]
+		cumulative += precip
+
+		barHeight := 0.0
+		if maxDaily > 0 {
+			barHeight = (precip / maxDaily) * 20
+		}
+
+		entries = append(entries, PrecipEntry{
+			Day:        d.Date[:3],
+			Daily:      fmt.Sprintf("%.2f\"", precip),
+			DailyVal:   precip,
+			Cumulative: fmt.Sprintf("%.2f\"", cumulative),
+			BarHeight:  barHeight,
+		})
+	}
+
+	return entries, fmt.Sprintf("%.2f\"", total)
+}
+
 func calcNWSPrecip(days []DailyRow) ([]PrecipEntry, string) {
 	var entries []PrecipEntry
 	var maxPrecip int
@@ -765,7 +923,40 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 
 		allHours := transformNWSHourly(hourly.Properties.Periods, timezone)
 		days, globalLow, globalHigh := transformNWSDaily(daily.Properties.Periods, timezone)
-		precip, totalPrecip := calcNWSPrecip(days)
+
+		// Fetch gridpoint data for quantitative precipitation
+		var precip []PrecipEntry
+		var totalPrecip string
+		gridpoint, err := fetchNWSGridpoint(nwsPoints.Properties.GridId, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
+		if err == nil {
+			// Extract dates from days for aggregation
+			loc, _ := time.LoadLocation(timezone)
+			if loc == nil {
+				loc = time.UTC
+			}
+			now := time.Now().In(loc)
+			var dates []string
+			for _, d := range days {
+				// Parse "Mon 01/02" format
+				t, err := time.ParseInLocation("Mon 01/02", d.Date, loc)
+				if err == nil {
+					t = time.Date(now.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+					dates = append(dates, t.Format("2006-01-02"))
+				}
+			}
+			precipByDay := aggregateNWSPrecipByDay(gridpoint, dates, timezone)
+			precip, totalPrecip = calcNWSPrecipWithQPF(days, precipByDay, timezone)
+
+			// Also update the daily rows with actual precip values
+			for i := range days {
+				if i < len(dates) {
+					days[i].Precip = fmt.Sprintf("%.2f\"", precipByDay[dates[i]])
+				}
+			}
+		} else {
+			log.Printf("NWS gridpoint error: %v, using probability only", err)
+			precip, totalPrecip = calcNWSPrecip(days)
+		}
 
 		if name == "" {
 			name = fmt.Sprintf("%.4s, %.4s", lat, lon)
