@@ -175,6 +175,29 @@ h1 {
   font-size: 12px;
 }
 
+/* Unit toggles */
+.unit-toggles {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.unit-toggle {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.unit-toggle:hover {
+  color: var(--fg);
+  border-color: var(--fg-dim);
+}
+
 /* Favorites bar */
 .favorites-bar {
   display: flex;

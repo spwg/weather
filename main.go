@@ -110,6 +110,7 @@ type HourlyRow struct {
 	Temp      int
 	FeelsLike int
 	Precip    string
+	PrecipRaw float64 // raw precipitation in inches, -1 if probability
 	WindSpeed int
 	WindDir   string
 	Condition string
@@ -125,33 +126,36 @@ type DailyRow struct {
 	BarLeft   float64
 	BarWidth  float64
 	Precip    string
+	PrecipRaw float64 // raw precipitation in inches, -1 if probability
 	Wind      int
 	Condition string
 	IsToday   bool
 }
 
 type PrecipEntry struct {
-	Day        string
-	Daily      string
-	DailyVal   float64
-	Cumulative string
-	BarHeight  float64
+	Day           string
+	Daily         string
+	DailyVal      float64
+	Cumulative    string
+	CumulativeRaw float64 // raw cumulative in inches, -1 if not applicable
+	BarHeight     float64
 }
 
 type ForecastData struct {
-	Name        string
-	Lat         string
-	Lon         string
-	Timezone    string
-	Elevation   int
-	Hours       []HourlyRow
-	MoreHours   []HourlyRow
-	MoreCount   int
-	Days        []DailyRow
-	Precip      []PrecipEntry
-	TotalPrecip string
-	GlobalLow   int
-	GlobalHigh  int
+	Name           string
+	Lat            string
+	Lon            string
+	Timezone       string
+	Elevation      int
+	Hours          []HourlyRow
+	MoreHours      []HourlyRow
+	MoreCount      int
+	Days           []DailyRow
+	Precip         []PrecipEntry
+	TotalPrecip    string
+	TotalPrecipRaw float64 // raw total in inches, -1 if not applicable
+	GlobalLow      int
+	GlobalHigh     int
 }
 
 type SearchData struct {
@@ -451,6 +455,7 @@ func transformHourly(data *ForecastResponse) []HourlyRow {
 			Temp:      int(math.Round(data.Hourly.Temperature[i])),
 			FeelsLike: int(math.Round(data.Hourly.ApparentTemp[i])),
 			Precip:    fmt.Sprintf("%.2f\"", data.Hourly.Precipitation[i]),
+			PrecipRaw: data.Hourly.Precipitation[i],
 			WindSpeed: int(math.Round(data.Hourly.WindSpeed[i])),
 			WindDir:   windDirLabel(data.Hourly.WindDirection[i]),
 			Condition: wmoDescription(data.Hourly.WeatherCode[i]),
@@ -508,6 +513,7 @@ func transformDaily(data *ForecastResponse) ([]DailyRow, int, int) {
 			BarLeft:   math.Round(barLeft*10) / 10,
 			BarWidth:  math.Round(barWidth*10) / 10,
 			Precip:    fmt.Sprintf("%.2f\"", data.Daily.PrecipSum[i]),
+			PrecipRaw: data.Daily.PrecipSum[i],
 			Wind:      int(math.Round(data.Daily.WindSpeedMax[i])),
 			Condition: wmoDescription(data.Daily.WeatherCode[i]),
 			IsToday:   dateStr == today,
@@ -542,11 +548,12 @@ func calcPrecipAccum(data *ForecastResponse) ([]PrecipEntry, string) {
 			barHeight = (daily / maxDaily) * 20
 		}
 		entries = append(entries, PrecipEntry{
-			Day:        t.Format("Mon"),
-			Daily:      fmt.Sprintf("%.2f\"", daily),
-			DailyVal:   daily,
-			Cumulative: fmt.Sprintf("%.2f\"", cumulative),
-			BarHeight:  barHeight,
+			Day:           t.Format("Mon"),
+			Daily:         fmt.Sprintf("%.2f\"", daily),
+			DailyVal:      daily,
+			Cumulative:    fmt.Sprintf("%.2f\"", cumulative),
+			CumulativeRaw: cumulative,
+			BarHeight:     barHeight,
 		})
 	}
 	return entries, fmt.Sprintf("%.2f\"", total)
@@ -585,6 +592,7 @@ func transformNWSHourly(periods []NWSPeriod, timezone string) []HourlyRow {
 			Temp:      p.Temperature,
 			FeelsLike: windchill(float64(p.Temperature), windSpeed),
 			Precip:    precip,
+			PrecipRaw: -1, // NWS hourly uses probability, not amount
 			WindSpeed: int(math.Round(windSpeed)),
 			WindDir:   p.WindDirection,
 			Condition: p.ShortForecast,
@@ -699,6 +707,7 @@ func transformNWSDaily(periods []NWSPeriod, timezone string) ([]DailyRow, int, i
 			BarLeft:   math.Round(barLeft*10) / 10,
 			BarWidth:  math.Round(barWidth*10) / 10,
 			Precip:    fmt.Sprintf("%d%%", d.precip),
+			PrecipRaw: -1, // Will be updated with QPF data if available
 			Wind:      d.wind,
 			Condition: d.condition,
 			IsToday:   dateStr == today,
@@ -833,11 +842,12 @@ func calcNWSPrecipWithQPF(days []DailyRow, precipByDay map[string]float64, timez
 		}
 
 		entries = append(entries, PrecipEntry{
-			Day:        d.Date[:3],
-			Daily:      fmt.Sprintf("%.2f\"", precip),
-			DailyVal:   precip,
-			Cumulative: fmt.Sprintf("%.2f\"", cumulative),
-			BarHeight:  barHeight,
+			Day:           d.Date[:3],
+			Daily:         fmt.Sprintf("%.2f\"", precip),
+			DailyVal:      precip,
+			Cumulative:    fmt.Sprintf("%.2f\"", cumulative),
+			CumulativeRaw: cumulative,
+			BarHeight:     barHeight,
 		})
 	}
 
@@ -865,11 +875,12 @@ func calcNWSPrecip(days []DailyRow) ([]PrecipEntry, string) {
 			barHeight = (float64(pct) / float64(maxPrecip)) * 20
 		}
 		entries = append(entries, PrecipEntry{
-			Day:        dayName,
-			Daily:      d.Precip, // Shows as "40%" etc
-			DailyVal:   float64(pct),
-			Cumulative: "--", // Accumulation doesn't make sense for probability
-			BarHeight:  barHeight,
+			Day:           dayName,
+			Daily:         d.Precip, // Shows as "40%" etc
+			DailyVal:      -1,       // Probability, not amount
+			Cumulative:    "--",     // Accumulation doesn't make sense for probability
+			CumulativeRaw: -1,
+			BarHeight:     barHeight,
 		})
 	}
 	return entries, fmt.Sprintf("%d%% max", maxPrecip)
@@ -951,6 +962,7 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 			for i := range days {
 				if i < len(dates) {
 					days[i].Precip = fmt.Sprintf("%.2f\"", precipByDay[dates[i]])
+					days[i].PrecipRaw = precipByDay[dates[i]]
 				}
 			}
 		} else {
@@ -970,20 +982,27 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 			moreHours = allHours[visibleHours:]
 		}
 
+		// Calculate raw total from last cumulative entry
+		totalPrecipRaw := -1.0
+		if len(precip) > 0 && precip[len(precip)-1].CumulativeRaw >= 0 {
+			totalPrecipRaw = precip[len(precip)-1].CumulativeRaw
+		}
+
 		fd = ForecastData{
-			Name:        name,
-			Lat:         lat,
-			Lon:         lon,
-			Timezone:    timezone,
-			Elevation:   0, // NWS doesn't provide elevation in points response
-			Hours:       hours,
-			MoreHours:   moreHours,
-			MoreCount:   len(moreHours),
-			Days:        days,
-			Precip:      precip,
-			TotalPrecip: totalPrecip,
-			GlobalLow:   globalLow,
-			GlobalHigh:  globalHigh,
+			Name:           name,
+			Lat:            lat,
+			Lon:            lon,
+			Timezone:       timezone,
+			Elevation:      0, // NWS doesn't provide elevation in points response
+			Hours:          hours,
+			MoreHours:      moreHours,
+			MoreCount:      len(moreHours),
+			Days:           days,
+			Precip:         precip,
+			TotalPrecip:    totalPrecip,
+			TotalPrecipRaw: totalPrecipRaw,
+			GlobalLow:      globalLow,
+			GlobalHigh:     globalHigh,
 		}
 
 		templates.ExecuteTemplate(w, "forecast.html", fd)
@@ -1017,20 +1036,27 @@ openMeteo:
 		moreHours = allHours[visibleHours:]
 	}
 
+	// Calculate raw total from last cumulative entry
+	totalPrecipRaw := -1.0
+	if len(precip) > 0 && precip[len(precip)-1].CumulativeRaw >= 0 {
+		totalPrecipRaw = precip[len(precip)-1].CumulativeRaw
+	}
+
 	fd = ForecastData{
-		Name:        name,
-		Lat:         lat,
-		Lon:         lon,
-		Timezone:    data.Timezone,
-		Elevation:   int(math.Round(data.Elevation * 3.28084)), // meters to feet
-		Hours:       hours,
-		MoreHours:   moreHours,
-		MoreCount:   len(moreHours),
-		Days:        days,
-		Precip:      precip,
-		TotalPrecip: totalPrecip,
-		GlobalLow:   globalLow,
-		GlobalHigh:  globalHigh,
+		Name:           name,
+		Lat:            lat,
+		Lon:            lon,
+		Timezone:       data.Timezone,
+		Elevation:      int(math.Round(data.Elevation * 3.28084)), // meters to feet
+		Hours:          hours,
+		MoreHours:      moreHours,
+		MoreCount:      len(moreHours),
+		Days:           days,
+		Precip:         precip,
+		TotalPrecip:    totalPrecip,
+		TotalPrecipRaw: totalPrecipRaw,
+		GlobalLow:      globalLow,
+		GlobalHigh:     globalHigh,
 	}
 
 	templates.ExecuteTemplate(w, "forecast.html", fd)

@@ -22,6 +22,10 @@
                hx-target="#search-results">
         <div id="search-results"></div>
       </div>
+      <div class="unit-toggles">
+        <button id="temp-unit-toggle" class="unit-toggle" onclick="toggleTempUnit()" title="Toggle temperature units">°F</button>
+        <button id="precip-unit-toggle" class="unit-toggle" onclick="togglePrecipUnit()" title="Toggle precipitation units">in</button>
+      </div>
     </div>
   </header>
 
@@ -206,6 +210,86 @@
       }
     }
 
+    // --- Unit preferences localStorage API ---
+
+    var TEMP_UNIT_KEY = 'wx-temp-unit';
+    var PRECIP_UNIT_KEY = 'wx-precip-unit';
+
+    function getTempUnit() {
+      return localStorage.getItem(TEMP_UNIT_KEY) || 'f';
+    }
+
+    function setTempUnit(unit) {
+      localStorage.setItem(TEMP_UNIT_KEY, unit);
+    }
+
+    function getPrecipUnit() {
+      return localStorage.getItem(PRECIP_UNIT_KEY) || 'in';
+    }
+
+    function setPrecipUnit(unit) {
+      localStorage.setItem(PRECIP_UNIT_KEY, unit);
+    }
+
+    function formatTemp(f, unit) {
+      if (unit === 'c') {
+        var c = Math.round((f - 32) * 5 / 9);
+        return c + '°';
+      }
+      return f + '°';
+    }
+
+    function formatPrecip(inches, unit) {
+      if (unit === 'mm') {
+        var mm = inches * 25.4;
+        return mm.toFixed(1) + 'mm';
+      }
+      return inches.toFixed(2) + '"';
+    }
+
+    function applyUnits() {
+      var tempUnit = getTempUnit();
+      var precipUnit = getPrecipUnit();
+
+      // Update all temperature elements
+      document.querySelectorAll('[data-temp-f]').forEach(function(el) {
+        var f = parseFloat(el.getAttribute('data-temp-f'));
+        if (!isNaN(f)) {
+          el.textContent = formatTemp(f, tempUnit);
+        }
+      });
+
+      // Update all precipitation elements (only those with data-precip-in)
+      document.querySelectorAll('[data-precip-in]').forEach(function(el) {
+        var inches = parseFloat(el.getAttribute('data-precip-in'));
+        if (!isNaN(inches) && inches >= 0) {
+          el.textContent = formatPrecip(inches, precipUnit);
+        }
+      });
+
+      // Update toggle button labels
+      var tempToggle = document.getElementById('temp-unit-toggle');
+      var precipToggle = document.getElementById('precip-unit-toggle');
+      if (tempToggle) {
+        tempToggle.textContent = tempUnit === 'c' ? '°C' : '°F';
+      }
+      if (precipToggle) {
+        precipToggle.textContent = precipUnit === 'mm' ? 'mm' : 'in';
+      }
+    }
+
+    function toggleTempUnit() {
+      var current = getTempUnit();
+      setTempUnit(current === 'f' ? 'c' : 'f');
+      applyUnits();
+    }
+
+    function togglePrecipUnit() {
+      var current = getPrecipUnit();
+      setPrecipUnit(current === 'in' ? 'mm' : 'in');
+      applyUnits();
+    }
+
     // --- Live clock ---
 
     function startClock() {
@@ -233,6 +317,7 @@
         updateStarState();
         renderFavorites();
         startClock();
+        applyUnits();
       }
       if (e.detail.target.id === 'search-results') {
         searchActiveIndex = -1;
@@ -256,6 +341,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
       renderFavorites();
+      applyUnits(); // Apply saved unit preferences
 
       var hashLoc = parseHash();
       if (hashLoc) {

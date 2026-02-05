@@ -27,9 +27,9 @@
           {{range .Hours}}
           <tr{{if .IsNow}} class="row-now"{{end}}>
             <td class="time-col">{{.Time}}</td>
-            <td class="num temp">{{.Temp}}°</td>
-            <td class="num feels">{{.FeelsLike}}°</td>
-            <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}">{{.Precip}}</td>
+            <td class="num temp" data-temp-f="{{.Temp}}">{{.Temp}}°</td>
+            <td class="num feels" data-temp-f="{{.FeelsLike}}">{{.FeelsLike}}°</td>
+            <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}"{{if ge .PrecipRaw 0.0}} data-precip-in="{{.PrecipRaw}}"{{end}}>{{.Precip}}</td>
             <td class="num wind">{{.WindSpeed}} {{.WindDir}}</td>
             <td class="cond">{{.Condition}}</td>
           </tr>
@@ -40,9 +40,9 @@
           {{range .MoreHours}}
           <tr{{if .IsNow}} class="row-now"{{end}}>
             <td class="time-col">{{.Time}}</td>
-            <td class="num temp">{{.Temp}}°</td>
-            <td class="num feels">{{.FeelsLike}}°</td>
-            <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}">{{.Precip}}</td>
+            <td class="num temp" data-temp-f="{{.Temp}}">{{.Temp}}°</td>
+            <td class="num feels" data-temp-f="{{.FeelsLike}}">{{.FeelsLike}}°</td>
+            <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}"{{if ge .PrecipRaw 0.0}} data-precip-in="{{.PrecipRaw}}"{{end}}>{{.Precip}}</td>
             <td class="num wind">{{.WindSpeed}} {{.WindDir}}</td>
             <td class="cond">{{.Condition}}</td>
           </tr>
@@ -69,7 +69,7 @@
         <thead>
           <tr>
             <th>Day</th>
-            <th class="bar-header" colspan="1">Temperature {{.GlobalLow}}°–{{.GlobalHigh}}°</th>
+            <th class="bar-header" colspan="1">Temperature <span data-temp-f="{{.GlobalLow}}">{{.GlobalLow}}°</span>–<span data-temp-f="{{.GlobalHigh}}">{{.GlobalHigh}}°</span></th>
             <th class="num">Precip</th>
             <th class="num">Wind</th>
             <th>Conditions</th>
@@ -81,14 +81,14 @@
             <td class="day-col">{{.Date}}</td>
             <td class="bar-cell">
               <div class="temp-bar-row">
-                <span class="temp-low" style="color:{{.LowColor}}">{{.Low}}°</span>
+                <span class="temp-low" data-temp-f="{{.Low}}" style="color:{{.LowColor}}">{{.Low}}°</span>
                 <div class="temp-bar-track">
                   <div class="temp-bar-fill" style="left:{{.BarLeft}}%;width:{{.BarWidth}}%;background:linear-gradient(to right,{{.LowColor}},{{.HighColor}})"></div>
                 </div>
-                <span class="temp-high" style="color:{{.HighColor}}">{{.High}}°</span>
+                <span class="temp-high" data-temp-f="{{.High}}" style="color:{{.HighColor}}">{{.High}}°</span>
               </div>
             </td>
-            <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}">{{.Precip}}</td>
+            <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}"{{if ge .PrecipRaw 0.0}} data-precip-in="{{.PrecipRaw}}"{{end}}>{{.Precip}}</td>
             <td class="num wind">{{.Wind}} mph</td>
             <td class="cond">{{.Condition}}</td>
           </tr>
@@ -103,7 +103,7 @@
   <section class="section">
     <div class="precip-header">
       <h2>Precipitation</h2>
-      <span class="precip-total">7-day total: {{.TotalPrecip}}</span>
+      <span class="precip-total">7-day total: <span{{if ge .TotalPrecipRaw 0.0}} data-precip-in="{{.TotalPrecipRaw}}"{{end}}>{{.TotalPrecip}}</span></span>
     </div>
     <div class="table-wrap">
       <table class="precip-table">
@@ -121,14 +121,14 @@
             {{range .Precip}}
             <td class="precip-bar-cell">
               {{if gt .BarHeight 0.0}}<div class="micro-bar" style="height:{{.BarHeight}}px"></div>{{end}}
-              <span class="{{if gt .DailyVal 0.0}}has-precip{{end}}">{{.Daily}}</span>
+              <span class="{{if gt .DailyVal 0.0}}has-precip{{end}}"{{if ge .DailyVal 0.0}} data-precip-in="{{.DailyVal}}"{{end}}>{{.Daily}}</span>
             </td>
             {{end}}
           </tr>
           <tr class="precip-cumul-row">
             <td class="row-label">Accum</td>
             {{range .Precip}}
-            <td class="cumul-val">{{.Cumulative}}</td>
+            <td class="cumul-val"{{if ge .CumulativeRaw 0.0}} data-precip-in="{{.CumulativeRaw}}"{{end}}>{{.Cumulative}}</td>
             {{end}}
           </tr>
         </tbody>
