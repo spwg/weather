@@ -56,6 +56,36 @@ type GeocodeResult struct {
 	Admin1    string  `json:"admin1"`
 }
 
+// NWS API response structs
+
+type NWSPointsResponse struct {
+	Properties struct {
+		Forecast       string `json:"forecast"`
+		ForecastHourly string `json:"forecastHourly"`
+		TimeZone       string `json:"timeZone"`
+	} `json:"properties"`
+}
+
+type NWSForecastResponse struct {
+	Properties struct {
+		Periods []NWSPeriod `json:"periods"`
+	} `json:"properties"`
+}
+
+type NWSPeriod struct {
+	Number                     int    `json:"number"`
+	Name                       string `json:"name"`
+	StartTime                  string `json:"startTime"`
+	IsDaytime                  bool   `json:"isDaytime"`
+	Temperature                int    `json:"temperature"`
+	WindSpeed                  string `json:"windSpeed"`
+	WindDirection              string `json:"windDirection"`
+	ShortForecast              string `json:"shortForecast"`
+	ProbabilityOfPrecipitation struct {
+		Value *int `json:"value"`
+	} `json:"probabilityOfPrecipitation"`
+}
+
 // View-model structs for templates
 
 type HourlyRow struct {
@@ -205,6 +235,25 @@ func tempToColor(temp float64) string {
 	return "#e0e0e0" // fallback
 }
 
+// windchill calculates the wind chill temperature using NWS formula.
+// Returns actual temp if conditions don't apply (temp >= 50°F or wind <= 3 mph).
+func windchill(tempF float64, windMph float64) int {
+	if tempF >= 50 || windMph <= 3 {
+		return int(math.Round(tempF))
+	}
+	// NWS Wind Chill formula
+	wc := 35.74 + 0.6215*tempF - 35.75*math.Pow(windMph, 0.16) + 0.4275*tempF*math.Pow(windMph, 0.16)
+	return int(math.Round(wc))
+}
+
+// parseWindSpeed extracts mph value from NWS wind string like "10 mph" or "5 to 10 mph"
+func parseWindSpeed(windStr string) float64 {
+	// Try to find the first number
+	var speed float64
+	fmt.Sscanf(windStr, "%f", &speed)
+	return speed
+}
+
 func fetchJSON(apiURL string, target any) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(apiURL)
@@ -241,6 +290,44 @@ func fetchGeocode(query string) (*GeocodeResponse, error) {
 	)
 	var data GeocodeResponse
 	if err := fetchJSON(apiURL, &data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+// NWS API requires User-Agent header
+func fetchNWSJSON(apiURL string, target any) error {
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "WX-Weather-App/1.0 (github.com/spwg/weather)")
+	req.Header.Set("Accept", "application/geo+json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("NWS request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("NWS API returned status %d", resp.StatusCode)
+	}
+	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+func fetchNWSPoints(lat, lon string) (*NWSPointsResponse, error) {
+	apiURL := fmt.Sprintf("https://api.weather.gov/points/%s,%s", lat, lon)
+	var data NWSPointsResponse
+	if err := fetchNWSJSON(apiURL, &data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func fetchNWSForecast(forecastURL string) (*NWSForecastResponse, error) {
+	var data NWSForecastResponse
+	if err := fetchNWSJSON(forecastURL, &data); err != nil {
 		return nil, err
 	}
 	return &data, nil
@@ -337,7 +424,7 @@ func transformHourly(data *ForecastResponse) []HourlyRow {
 			Time:      t.Format("3 PM"),
 			Temp:      int(math.Round(data.Hourly.Temperature[i])),
 			FeelsLike: int(math.Round(data.Hourly.ApparentTemp[i])),
-			Precip:    fmt.Sprintf("%.2f", data.Hourly.Precipitation[i]),
+			Precip:    fmt.Sprintf("%.2f\"", data.Hourly.Precipitation[i]),
 			WindSpeed: int(math.Round(data.Hourly.WindSpeed[i])),
 			WindDir:   windDirLabel(data.Hourly.WindDirection[i]),
 			Condition: wmoDescription(data.Hourly.WeatherCode[i]),
@@ -394,7 +481,7 @@ func transformDaily(data *ForecastResponse) ([]DailyRow, int, int) {
 			HighColor: tempToColor(high),
 			BarLeft:   math.Round(barLeft*10) / 10,
 			BarWidth:  math.Round(barWidth*10) / 10,
-			Precip:    fmt.Sprintf("%.2f", data.Daily.PrecipSum[i]),
+			Precip:    fmt.Sprintf("%.2f\"", data.Daily.PrecipSum[i]),
 			Wind:      int(math.Round(data.Daily.WindSpeedMax[i])),
 			Condition: wmoDescription(data.Daily.WeatherCode[i]),
 			IsToday:   dateStr == today,
@@ -430,13 +517,204 @@ func calcPrecipAccum(data *ForecastResponse) ([]PrecipEntry, string) {
 		}
 		entries = append(entries, PrecipEntry{
 			Day:        t.Format("Mon"),
-			Daily:      fmt.Sprintf("%.2f", daily),
+			Daily:      fmt.Sprintf("%.2f\"", daily),
 			DailyVal:   daily,
-			Cumulative: fmt.Sprintf("%.2f", cumulative),
+			Cumulative: fmt.Sprintf("%.2f\"", cumulative),
 			BarHeight:  barHeight,
 		})
 	}
-	return entries, fmt.Sprintf("%.2f", total)
+	return entries, fmt.Sprintf("%.2f\"", total)
+}
+
+// NWS transformation functions
+
+func transformNWSHourly(periods []NWSPeriod, timezone string) []HourlyRow {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	now := time.Now().In(loc)
+
+	var rows []HourlyRow
+	for _, p := range periods {
+		t, err := time.Parse(time.RFC3339, p.StartTime)
+		if err != nil {
+			continue
+		}
+		t = t.In(loc)
+		if t.Before(now.Truncate(time.Hour)) {
+			continue
+		}
+		if len(rows) >= 12 {
+			break
+		}
+
+		windSpeed := parseWindSpeed(p.WindSpeed)
+		precip := "0%"
+		if p.ProbabilityOfPrecipitation.Value != nil {
+			precip = fmt.Sprintf("%d%%", *p.ProbabilityOfPrecipitation.Value)
+		}
+		rows = append(rows, HourlyRow{
+			Time:      t.Format("3 PM"),
+			Temp:      p.Temperature,
+			FeelsLike: windchill(float64(p.Temperature), windSpeed),
+			Precip:    precip,
+			WindSpeed: int(math.Round(windSpeed)),
+			WindDir:   p.WindDirection,
+			Condition: p.ShortForecast,
+			IsNow:     t.Hour() == now.Hour(),
+		})
+	}
+	return rows
+}
+
+func transformNWSDaily(periods []NWSPeriod, timezone string) ([]DailyRow, int, int) {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	today := time.Now().In(loc).Format("2006-01-02")
+
+	// Group periods by date, extracting high (daytime) and low (nighttime)
+	type dayData struct {
+		date      string
+		high      int
+		low       int
+		wind      int
+		precip    int // max probability of precipitation
+		condition string
+		hasHigh   bool
+		hasLow    bool
+	}
+	days := make(map[string]*dayData)
+	var dateOrder []string
+
+	for _, p := range periods {
+		t, err := time.Parse(time.RFC3339, p.StartTime)
+		if err != nil {
+			continue
+		}
+		dateStr := t.In(loc).Format("2006-01-02")
+
+		if _, exists := days[dateStr]; !exists {
+			days[dateStr] = &dayData{date: dateStr}
+			dateOrder = append(dateOrder, dateStr)
+		}
+
+		d := days[dateStr]
+		windSpeed := int(parseWindSpeed(p.WindSpeed))
+		if windSpeed > d.wind {
+			d.wind = windSpeed
+		}
+
+		// Track max precipitation probability for the day
+		if p.ProbabilityOfPrecipitation.Value != nil && *p.ProbabilityOfPrecipitation.Value > d.precip {
+			d.precip = *p.ProbabilityOfPrecipitation.Value
+		}
+
+		if p.IsDaytime {
+			d.high = p.Temperature
+			d.condition = p.ShortForecast
+			d.hasHigh = true
+		} else {
+			d.low = p.Temperature
+			d.hasLow = true
+			if !d.hasHigh {
+				d.condition = p.ShortForecast
+			}
+		}
+	}
+
+	// Find global min/max for bar scaling
+	globalMin := math.Inf(1)
+	globalMax := math.Inf(-1)
+	for _, d := range days {
+		if d.hasLow && float64(d.low) < globalMin {
+			globalMin = float64(d.low)
+		}
+		if d.hasHigh && float64(d.high) > globalMax {
+			globalMax = float64(d.high)
+		}
+	}
+	tempRange := globalMax - globalMin
+	if tempRange == 0 {
+		tempRange = 1
+	}
+
+	var rows []DailyRow
+	for _, dateStr := range dateOrder {
+		d := days[dateStr]
+		if !d.hasHigh && !d.hasLow {
+			continue
+		}
+
+		t, _ := time.ParseInLocation("2006-01-02", dateStr, loc)
+		low := d.low
+		high := d.high
+		if !d.hasLow {
+			low = high - 10 // estimate
+		}
+		if !d.hasHigh {
+			high = low + 10 // estimate
+		}
+
+		barLeft := ((float64(low) - globalMin) / tempRange) * 100
+		barWidth := ((float64(high) - float64(low)) / tempRange) * 100
+		if barWidth < 2 {
+			barWidth = 2
+		}
+
+		rows = append(rows, DailyRow{
+			Date:      t.Format("Mon 01/02"),
+			Low:       low,
+			High:      high,
+			LowColor:  tempToColor(float64(low)),
+			HighColor: tempToColor(float64(high)),
+			BarLeft:   math.Round(barLeft*10) / 10,
+			BarWidth:  math.Round(barWidth*10) / 10,
+			Precip:    fmt.Sprintf("%d%%", d.precip),
+			Wind:      d.wind,
+			Condition: d.condition,
+			IsToday:   dateStr == today,
+		})
+
+		if len(rows) >= 7 {
+			break
+		}
+	}
+
+	return rows, int(math.Round(globalMin)), int(math.Round(globalMax))
+}
+
+func calcNWSPrecip(days []DailyRow) ([]PrecipEntry, string) {
+	var entries []PrecipEntry
+	var maxPrecip int
+	for _, d := range days {
+		// Extract percentage value from string like "40%"
+		var pct int
+		fmt.Sscanf(d.Precip, "%d%%", &pct)
+		if pct > maxPrecip {
+			maxPrecip = pct
+		}
+	}
+
+	for _, d := range days {
+		dayName := d.Date[:3]
+		var pct int
+		fmt.Sscanf(d.Precip, "%d%%", &pct)
+		barHeight := 0.0
+		if maxPrecip > 0 {
+			barHeight = (float64(pct) / float64(maxPrecip)) * 20
+		}
+		entries = append(entries, PrecipEntry{
+			Day:        dayName,
+			Daily:      d.Precip, // Shows as "40%" etc
+			DailyVal:   float64(pct),
+			Cumulative: "--", // Accumulation doesn't make sense for probability
+			BarHeight:  barHeight,
+		})
+	}
+	return entries, fmt.Sprintf("%d%% max", maxPrecip)
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -457,9 +735,77 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var fd ForecastData
+	fd.Lat = lat
+	fd.Lon = lon
+	fd.Name = name
+
+	// Try NWS API first (for US locations)
+	nwsPoints, err := fetchNWSPoints(lat, lon)
+	if err == nil {
+		// NWS succeeded - this is a US location
+		log.Printf("Using NWS API for %s,%s", lat, lon)
+
+		// Fetch daily and hourly forecasts
+		daily, err := fetchNWSForecast(nwsPoints.Properties.Forecast)
+		if err != nil {
+			log.Printf("NWS daily forecast error: %v, falling back to Open-Meteo", err)
+			goto openMeteo
+		}
+		hourly, err := fetchNWSForecast(nwsPoints.Properties.ForecastHourly)
+		if err != nil {
+			log.Printf("NWS hourly forecast error: %v, falling back to Open-Meteo", err)
+			goto openMeteo
+		}
+
+		timezone := nwsPoints.Properties.TimeZone
+		if timezone == "" {
+			timezone = "America/New_York"
+		}
+
+		allHours := transformNWSHourly(hourly.Properties.Periods, timezone)
+		days, globalLow, globalHigh := transformNWSDaily(daily.Properties.Periods, timezone)
+		precip, totalPrecip := calcNWSPrecip(days)
+
+		if name == "" {
+			name = fmt.Sprintf("%.4s, %.4s", lat, lon)
+		}
+
+		const visibleHours = 3
+		hours := allHours
+		var moreHours []HourlyRow
+		if len(allHours) > visibleHours {
+			hours = allHours[:visibleHours]
+			moreHours = allHours[visibleHours:]
+		}
+
+		fd = ForecastData{
+			Name:        name,
+			Lat:         lat,
+			Lon:         lon,
+			Timezone:    timezone,
+			Elevation:   0, // NWS doesn't provide elevation in points response
+			Hours:       hours,
+			MoreHours:   moreHours,
+			MoreCount:   len(moreHours),
+			Days:        days,
+			Precip:      precip,
+			TotalPrecip: totalPrecip,
+			GlobalLow:   globalLow,
+			GlobalHigh:  globalHigh,
+		}
+
+		templates.ExecuteTemplate(w, "forecast.html", fd)
+		return
+	}
+
+	log.Printf("NWS points error for %s,%s: %v, using Open-Meteo", lat, lon, err)
+
+openMeteo:
+	// Fallback to Open-Meteo (for non-US or NWS failures)
 	data, err := fetchForecast(lat, lon)
 	if err != nil {
-		log.Printf("forecast error: %v", err)
+		log.Printf("Open-Meteo forecast error: %v", err)
 		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Weather data unavailable"})
 		return
 	}
@@ -480,7 +826,7 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 		moreHours = allHours[visibleHours:]
 	}
 
-	fd := ForecastData{
+	fd = ForecastData{
 		Name:        name,
 		Lat:         lat,
 		Lon:         lon,

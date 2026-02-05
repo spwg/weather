@@ -29,7 +29,7 @@
             <td class="time-col">{{.Time}}</td>
             <td class="num temp">{{.Temp}}°</td>
             <td class="num feels">{{.FeelsLike}}°</td>
-            <td class="num precip{{if ne .Precip "0.00"}} has-precip{{end}}">{{.Precip}}"</td>
+            <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}">{{.Precip}}</td>
             <td class="num wind">{{.WindSpeed}} {{.WindDir}}</td>
             <td class="cond">{{.Condition}}</td>
           </tr>
@@ -42,7 +42,7 @@
             <td class="time-col">{{.Time}}</td>
             <td class="num temp">{{.Temp}}°</td>
             <td class="num feels">{{.FeelsLike}}°</td>
-            <td class="num precip{{if ne .Precip "0.00"}} has-precip{{end}}">{{.Precip}}"</td>
+            <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}">{{.Precip}}</td>
             <td class="num wind">{{.WindSpeed}} {{.WindDir}}</td>
             <td class="cond">{{.Condition}}</td>
           </tr>
@@ -88,7 +88,7 @@
                 <span class="temp-high" style="color:{{.HighColor}}">{{.High}}°</span>
               </div>
             </td>
-            <td class="num precip{{if ne .Precip "0.00"}} has-precip{{end}}">{{.Precip}}"</td>
+            <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}">{{.Precip}}</td>
             <td class="num wind">{{.Wind}} mph</td>
             <td class="cond">{{.Condition}}</td>
           </tr>
@@ -103,7 +103,7 @@
   <section class="section">
     <div class="precip-header">
       <h2>Precipitation</h2>
-      <span class="precip-total">7-day total: {{.TotalPrecip}}"</span>
+      <span class="precip-total">7-day total: {{.TotalPrecip}}</span>
     </div>
     <div class="table-wrap">
       <table class="precip-table">
@@ -121,14 +121,14 @@
             {{range .Precip}}
             <td class="precip-bar-cell">
               {{if gt .BarHeight 0.0}}<div class="micro-bar" style="height:{{.BarHeight}}px"></div>{{end}}
-              <span class="{{if gt .DailyVal 0.0}}has-precip{{end}}">{{.Daily}}"</span>
+              <span class="{{if gt .DailyVal 0.0}}has-precip{{end}}">{{.Daily}}</span>
             </td>
             {{end}}
           </tr>
           <tr class="precip-cumul-row">
             <td class="row-label">Accum</td>
             {{range .Precip}}
-            <td class="cumul-val">{{.Cumulative}}"</td>
+            <td class="cumul-val">{{.Cumulative}}</td>
             {{end}}
           </tr>
         </tbody>
