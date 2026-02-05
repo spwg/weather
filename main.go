@@ -1283,6 +1283,26 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 					days[i].PrecipRaw = precipByDay[dates[i]]
 				}
 			}
+
+			// Also update the hourly rows with QPF precipitation amounts
+			todayStr := now.Format("2006-01-02")
+			tomorrowStr := now.Add(24 * time.Hour).Format("2006-01-02")
+			todayQPF := distributeQPFToHours(gridpoint, todayStr, timezone)
+			tomorrowQPF := distributeQPFToHours(gridpoint, tomorrowStr, timezone)
+			hourCursor := now.Truncate(time.Hour)
+			for i := range allHours {
+				t := hourCursor.Add(time.Duration(i) * time.Hour)
+				dateStr := t.Format("2006-01-02")
+				hour := t.Hour()
+				var precipVal float64
+				if dateStr == todayStr {
+					precipVal = todayQPF[hour]
+				} else {
+					precipVal = tomorrowQPF[hour]
+				}
+				allHours[i].PrecipRaw = precipVal
+				allHours[i].Precip = fmt.Sprintf("%.2f\"", precipVal)
+			}
 		} else {
 			log.Printf("NWS gridpoint error: %v, using probability only", err)
 			precip, totalPrecip = calcNWSPrecip(days)
