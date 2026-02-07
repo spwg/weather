@@ -1478,6 +1478,10 @@ func handleNearby(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func handleSettings(w http.ResponseWriter, r *http.Request) {
+	templates.ExecuteTemplate(w, "settings.html", nil)
+}
+
 func main() {
 	funcMap := template.FuncMap{
 		"gt": func(a, b float64) bool { return a > b },
@@ -1490,6 +1494,7 @@ func main() {
 	http.HandleFunc("/day-forecast", handleDayForecast)
 	http.HandleFunc("/search", handleSearch)
 	http.HandleFunc("/nearby", handleNearby)
+	http.HandleFunc("/settings", handleSettings)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	port := os.Getenv("PORT")

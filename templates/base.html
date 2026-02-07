@@ -22,26 +22,9 @@
                hx-target="#search-results">
         <div id="search-results"></div>
       </div>
-      <button id="settings-btn" class="settings-btn" onclick="toggleSettings()" title="Settings">&#9881;</button>
+      <button id="settings-btn" class="settings-btn" hx-get="/settings" hx-target="#forecast-container" title="Settings" onclick="onSettingsClick()">&#9881;</button>
     </div>
   </header>
-
-  <div id="settings-panel" class="settings-panel">
-    <div class="settings-group">
-      <span class="settings-label">Temp</span>
-      <div class="settings-options">
-        <button id="temp-f-btn" class="settings-option" onclick="setTempPref('f')">°F</button>
-        <button id="temp-c-btn" class="settings-option" onclick="setTempPref('c')">°C</button>
-      </div>
-    </div>
-    <div class="settings-group">
-      <span class="settings-label">Precip</span>
-      <div class="settings-options">
-        <button id="precip-in-btn" class="settings-option" onclick="setPrecipPref('in')">in</button>
-        <button id="precip-mm-btn" class="settings-option" onclick="setPrecipPref('mm')">mm</button>
-      </div>
-    </div>
-  </div>
 
   <div id="favorites-bar" class="favorites-bar"></div>
 
@@ -304,11 +287,14 @@
         }
       });
 
-      // Update active state on settings buttons
-      document.getElementById('temp-f-btn').classList.toggle('active', tempUnit === 'f');
-      document.getElementById('temp-c-btn').classList.toggle('active', tempUnit === 'c');
-      document.getElementById('precip-in-btn').classList.toggle('active', precipUnit === 'in');
-      document.getElementById('precip-mm-btn').classList.toggle('active', precipUnit === 'mm');
+      // Update active state on settings buttons (if on settings page)
+      var tempFBtn = document.getElementById('temp-f-btn');
+      if (tempFBtn) {
+        tempFBtn.classList.toggle('active', tempUnit === 'f');
+        document.getElementById('temp-c-btn').classList.toggle('active', tempUnit === 'c');
+        document.getElementById('precip-in-btn').classList.toggle('active', precipUnit === 'in');
+        document.getElementById('precip-mm-btn').classList.toggle('active', precipUnit === 'mm');
+      }
     }
 
     function setTempPref(unit) {
@@ -321,9 +307,12 @@
       applyUnits();
     }
 
-    function toggleSettings() {
-      var panel = document.getElementById('settings-panel');
-      panel.classList.toggle('open');
+    function onSettingsClick() {
+      history.pushState({ settings: true }, '', '#settings');
+    }
+
+    function goBackFromSettings() {
+      history.back();
     }
 
     // --- Live clock ---
@@ -363,6 +352,11 @@
     // --- Back/forward navigation ---
 
     window.addEventListener('popstate', function() {
+      var hash = window.location.hash.substring(1);
+      if (hash === 'settings') {
+        htmx.ajax('GET', '/settings', {target: '#forecast-container'});
+        return;
+      }
       var loc = parseHash();
       if (!loc) return;
       if (loc.nearby) {
@@ -416,18 +410,13 @@
         if (!e.target.closest('.search-container')) {
           document.getElementById('search-results').innerHTML = '';
         }
-        // Close settings panel when clicking outside
-        if (!e.target.closest('.settings-panel') && !e.target.closest('.settings-btn')) {
-          document.getElementById('settings-panel').classList.remove('open');
-        }
       });
 
-      // Close search results and settings on escape
+      // Close search results on escape
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
           document.getElementById('search-results').innerHTML = '';
           document.getElementById('search-input').blur();
-          document.getElementById('settings-panel').classList.remove('open');
         }
       });
 

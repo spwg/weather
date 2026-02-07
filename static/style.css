@@ -194,32 +194,26 @@ h1 {
   border-color: var(--fg-dim);
 }
 
-/* Settings panel */
-.settings-panel {
-  display: none;
+/* Settings page */
+.settings-page {
+  animation: fadeIn 0.15s ease-in;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
-  padding: 8px 0 12px;
-  margin-bottom: 12px;
 }
 
-.settings-panel.open {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+.settings-row:last-child {
+  border-bottom: none;
 }
 
-.settings-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.settings-label {
-  color: var(--fg-dim);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.settings-row-label {
+  color: var(--fg);
+  font-size: 13px;
 }
 
 .settings-options {
@@ -231,8 +225,8 @@ h1 {
   border: 1px solid var(--border);
   color: var(--fg-muted);
   font-family: var(--font);
-  font-size: 12px;
-  padding: 3px 10px;
+  font-size: 13px;
+  padding: 6px 16px;
   cursor: pointer;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }

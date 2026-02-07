@@ -1,0 +1,26 @@
+{{define "settings.html"}}
+<div class="settings-page">
+  <div class="day-header">
+    <a href="#" class="back-link" onclick="goBackFromSettings();return false;">&larr; Back</a>
+    <span class="location-name">Settings</span>
+  </div>
+
+  <section class="section">
+    <h2>Units</h2>
+    <div class="settings-row">
+      <span class="settings-row-label">Temperature</span>
+      <div class="settings-options">
+        <button id="temp-f-btn" class="settings-option" onclick="setTempPref('f')">°F</button>
+        <button id="temp-c-btn" class="settings-option" onclick="setTempPref('c')">°C</button>
+      </div>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Precipitation</span>
+      <div class="settings-options">
+        <button id="precip-in-btn" class="settings-option" onclick="setPrecipPref('in')">in</button>
+        <button id="precip-mm-btn" class="settings-option" onclick="setPrecipPref('mm')">mm</button>
+      </div>
+    </div>
+  </section>
+</div>
+{{end}}
