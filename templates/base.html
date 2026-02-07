@@ -27,19 +27,15 @@
   </header>
 
   <div id="settings-panel" class="settings-panel">
-    <div class="settings-header">
-      <span class="settings-title">Settings</span>
-      <button class="settings-close" onclick="toggleSettings()" title="Close">&times;</button>
-    </div>
     <div class="settings-group">
-      <label class="settings-label">Temperature</label>
+      <span class="settings-label">Temp</span>
       <div class="settings-options">
         <button id="temp-f-btn" class="settings-option" onclick="setTempPref('f')">°F</button>
         <button id="temp-c-btn" class="settings-option" onclick="setTempPref('c')">°C</button>
       </div>
     </div>
     <div class="settings-group">
-      <label class="settings-label">Precipitation</label>
+      <span class="settings-label">Precip</span>
       <div class="settings-options">
         <button id="precip-in-btn" class="settings-option" onclick="setPrecipPref('in')">in</button>
         <button id="precip-mm-btn" class="settings-option" onclick="setPrecipPref('mm')">mm</button>
