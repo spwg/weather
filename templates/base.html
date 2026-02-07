@@ -22,12 +22,30 @@
                hx-target="#search-results">
         <div id="search-results"></div>
       </div>
-      <div class="unit-toggles">
-        <button id="temp-unit-toggle" class="unit-toggle" onclick="toggleTempUnit()" title="Toggle temperature units">°F</button>
-        <button id="precip-unit-toggle" class="unit-toggle" onclick="togglePrecipUnit()" title="Toggle precipitation units">in</button>
-      </div>
+      <button id="settings-btn" class="settings-btn" onclick="toggleSettings()" title="Settings">&#9881;</button>
     </div>
   </header>
+
+  <div id="settings-panel" class="settings-panel">
+    <div class="settings-header">
+      <span class="settings-title">Settings</span>
+      <button class="settings-close" onclick="toggleSettings()" title="Close">&times;</button>
+    </div>
+    <div class="settings-group">
+      <label class="settings-label">Temperature</label>
+      <div class="settings-options">
+        <button id="temp-f-btn" class="settings-option" onclick="setTempPref('f')">°F</button>
+        <button id="temp-c-btn" class="settings-option" onclick="setTempPref('c')">°C</button>
+      </div>
+    </div>
+    <div class="settings-group">
+      <label class="settings-label">Precipitation</label>
+      <div class="settings-options">
+        <button id="precip-in-btn" class="settings-option" onclick="setPrecipPref('in')">in</button>
+        <button id="precip-mm-btn" class="settings-option" onclick="setPrecipPref('mm')">mm</button>
+      </div>
+    </div>
+  </div>
 
   <div id="favorites-bar" class="favorites-bar"></div>
 
@@ -290,27 +308,26 @@
         }
       });
 
-      // Update toggle button labels to show what you'll switch TO
-      var tempToggle = document.getElementById('temp-unit-toggle');
-      var precipToggle = document.getElementById('precip-unit-toggle');
-      if (tempToggle) {
-        tempToggle.textContent = tempUnit === 'c' ? '°F' : '°C';
-      }
-      if (precipToggle) {
-        precipToggle.textContent = precipUnit === 'mm' ? 'in' : 'mm';
-      }
+      // Update active state on settings buttons
+      document.getElementById('temp-f-btn').classList.toggle('active', tempUnit === 'f');
+      document.getElementById('temp-c-btn').classList.toggle('active', tempUnit === 'c');
+      document.getElementById('precip-in-btn').classList.toggle('active', precipUnit === 'in');
+      document.getElementById('precip-mm-btn').classList.toggle('active', precipUnit === 'mm');
     }
 
-    function toggleTempUnit() {
-      var current = getTempUnit();
-      setTempUnit(current === 'f' ? 'c' : 'f');
+    function setTempPref(unit) {
+      setTempUnit(unit);
       applyUnits();
     }
 
-    function togglePrecipUnit() {
-      var current = getPrecipUnit();
-      setPrecipUnit(current === 'in' ? 'mm' : 'in');
+    function setPrecipPref(unit) {
+      setPrecipUnit(unit);
       applyUnits();
+    }
+
+    function toggleSettings() {
+      var panel = document.getElementById('settings-panel');
+      panel.classList.toggle('open');
     }
 
     // --- Live clock ---
@@ -403,13 +420,18 @@
         if (!e.target.closest('.search-container')) {
           document.getElementById('search-results').innerHTML = '';
         }
+        // Close settings panel when clicking outside
+        if (!e.target.closest('.settings-panel') && !e.target.closest('.settings-btn')) {
+          document.getElementById('settings-panel').classList.remove('open');
+        }
       });
 
-      // Close search results on escape
+      // Close search results and settings on escape
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
           document.getElementById('search-results').innerHTML = '';
           document.getElementById('search-input').blur();
+          document.getElementById('settings-panel').classList.remove('open');
         }
       });
 
