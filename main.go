@@ -16,6 +16,14 @@ import (
 	"time"
 )
 
+var (
+	nowFunc          = time.Now
+	openMeteoBaseURL = "https://api.open-meteo.com"
+	geocodeBaseURL   = "https://geocoding-api.open-meteo.com"
+	nwsBaseURL       = "https://api.weather.gov"
+	nominatimBaseURL = "https://nominatim.openstreetmap.org"
+)
+
 // Open-Meteo API response structs
 
 type ForecastResponse struct {
@@ -305,7 +313,7 @@ func fetchJSON(apiURL string, target any) error {
 
 func fetchForecast(lat, lon string) (*ForecastResponse, error) {
 	apiURL := fmt.Sprintf(
-		"https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s"+
+		openMeteoBaseURL+"/v1/forecast?latitude=%s&longitude=%s"+
 			"&hourly=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,weather_code"+
 			"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code"+
 			"&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch"+
@@ -321,7 +329,7 @@ func fetchForecast(lat, lon string) (*ForecastResponse, error) {
 
 func fetchGeocode(query string) (*GeocodeResponse, error) {
 	apiURL := fmt.Sprintf(
-		"https://geocoding-api.open-meteo.com/v1/search?name=%s&count=5&language=en&format=json",
+		geocodeBaseURL+"/v1/search?name=%s&count=5&language=en&format=json",
 		url.QueryEscape(query),
 	)
 	var data GeocodeResponse
@@ -353,7 +361,7 @@ func fetchNWSJSON(apiURL string, target any) error {
 }
 
 func fetchNWSPoints(lat, lon string) (*NWSPointsResponse, error) {
-	apiURL := fmt.Sprintf("https://api.weather.gov/points/%s,%s", lat, lon)
+	apiURL := fmt.Sprintf(nwsBaseURL+"/points/%s,%s", lat, lon)
 	var data NWSPointsResponse
 	if err := fetchNWSJSON(apiURL, &data); err != nil {
 		return nil, err
@@ -370,7 +378,7 @@ func fetchNWSForecast(forecastURL string) (*NWSForecastResponse, error) {
 }
 
 func fetchNWSGridpoint(gridId string, gridX, gridY int) (*NWSGridpointResponse, error) {
-	apiURL := fmt.Sprintf("https://api.weather.gov/gridpoints/%s/%d,%d", gridId, gridX, gridY)
+	apiURL := fmt.Sprintf(nwsBaseURL+"/gridpoints/%s/%d,%d", gridId, gridX, gridY)
 	var data NWSGridpointResponse
 	if err := fetchNWSJSON(apiURL, &data); err != nil {
 		return nil, err
@@ -380,7 +388,7 @@ func fetchNWSGridpoint(gridId string, gridX, gridY int) (*NWSGridpointResponse, 
 
 func reverseGeocode(lat, lon string) (string, error) {
 	apiURL := fmt.Sprintf(
-		"https://nominatim.openstreetmap.org/reverse?lat=%s&lon=%s&format=json&zoom=10",
+		nominatimBaseURL+"/reverse?lat=%s&lon=%s&format=json&zoom=10",
 		url.QueryEscape(lat), url.QueryEscape(lon),
 	)
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -451,7 +459,7 @@ func transformHourly(data *ForecastResponse) []HourlyRow {
 	if err != nil {
 		loc = time.UTC
 	}
-	now := time.Now().In(loc)
+	now := nowFunc().In(loc)
 
 	var rows []HourlyRow
 	for i, ts := range data.Hourly.Time {
@@ -485,7 +493,7 @@ func transformDaily(data *ForecastResponse) ([]DailyRow, int, int) {
 	if err != nil {
 		loc = time.UTC
 	}
-	today := time.Now().In(loc).Format("2006-01-02")
+	today := nowFunc().In(loc).Format("2006-01-02")
 
 	// Find global min/max for bar scaling
 	globalMin := math.Inf(1)
@@ -582,7 +590,7 @@ func transformNWSHourly(periods []NWSPeriod, timezone string) []HourlyRow {
 	if err != nil {
 		loc = time.UTC
 	}
-	now := time.Now().In(loc)
+	now := nowFunc().In(loc)
 
 	var rows []HourlyRow
 	for _, p := range periods {
@@ -623,7 +631,7 @@ func transformNWSDaily(periods []NWSPeriod, timezone string) ([]DailyRow, int, i
 	if err != nil {
 		loc = time.UTC
 	}
-	today := time.Now().In(loc).Format("2006-01-02")
+	today := nowFunc().In(loc).Format("2006-01-02")
 
 	// Group periods by date, extracting high (daytime) and low (nighttime)
 	type dayData struct {
@@ -870,7 +878,7 @@ func calcNWSPrecipWithQPF(days []DailyRow, precipByDay map[string]float64, timez
 			continue
 		}
 		// Set year to current year
-		now := time.Now().In(loc)
+		now := nowFunc().In(loc)
 		t = time.Date(now.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 		dateStr := t.Format("2006-01-02")
 
@@ -888,7 +896,7 @@ func calcNWSPrecipWithQPF(days []DailyRow, precipByDay map[string]float64, timez
 		if err != nil {
 			continue
 		}
-		now := time.Now().In(loc)
+		now := nowFunc().In(loc)
 		t = time.Date(now.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 		dateStr := t.Format("2006-01-02")
 
@@ -951,7 +959,7 @@ func transformHourlyForDay(data *ForecastResponse, targetDate string) []HourlyRo
 	if err != nil {
 		loc = time.UTC
 	}
-	now := time.Now().In(loc)
+	now := nowFunc().In(loc)
 	today := now.Format("2006-01-02")
 
 	var rows []HourlyRow
@@ -989,7 +997,7 @@ func transformNWSHourlyForDay(periods []NWSPeriod, timezone string, targetDate s
 	if err != nil {
 		loc = time.UTC
 	}
-	now := time.Now().In(loc)
+	now := nowFunc().In(loc)
 	today := now.Format("2006-01-02")
 
 	var rows []HourlyRow
@@ -1114,7 +1122,7 @@ func handleDayForecast(w http.ResponseWriter, r *http.Request) {
 			if loc == nil {
 				loc = time.UTC
 			}
-			now := time.Now().In(loc)
+			now := nowFunc().In(loc)
 			var dates []string
 			for _, d := range days {
 				t, err := time.ParseInLocation("Mon 01/02", d.Date, loc)
@@ -1263,7 +1271,7 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 			if loc == nil {
 				loc = time.UTC
 			}
-			now := time.Now().In(loc)
+			now := nowFunc().In(loc)
 			var dates []string
 			for _, d := range days {
 				// Parse "Mon 01/02" format
