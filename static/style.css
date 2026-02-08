@@ -175,9 +175,28 @@ h1 {
   font-size: 12px;
 }
 
+/* Locate button */
+.locate-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  padding: 4px 6px;
+  cursor: pointer;
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.locate-btn:hover {
+  color: var(--fg);
+  border-color: var(--fg-dim);
+}
+
 /* Settings gear button */
 .settings-btn {
-  margin-left: auto;
   background: none;
   border: 1px solid var(--border);
   color: var(--fg-dim);
