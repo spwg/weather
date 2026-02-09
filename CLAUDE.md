@@ -12,6 +12,10 @@ livereload                  # dev server with auto-rebuild + browser refresh (ne
 fly deploy                  # deploy to Fly.io (push to github to trigger deploy)
 ```
 
+## Formatting
+
+Run `gofmt -w .` to format the code before committing.
+
 ## Architecture
 
 Single-file Go app (`main.go`) with zero external dependencies. All application code lives in one file; templates in `templates/`.
@@ -42,6 +46,6 @@ All timezone-aware code follows the pattern: `loc, err := time.LoadLocation(time
 
 ## Style
 
-- Google Go Style Guide conventions
+- Google Go Style Guide conventions (https://google.github.io/styleguide/go/, https://google.github.io/styleguide/go/guide, https://google.github.io/styleguide/go/decisions, https://google.github.io/styleguide/go/best-practices)
 - Receiver name always `s` for `*server`
 - No premature interfaces

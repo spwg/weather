@@ -158,7 +158,7 @@ func newNWSMockServer(t *testing.T) *httptest.Server {
 		resp.Properties.Forecast = serverURL + "/daily-forecast"
 		resp.Properties.ForecastHourly = serverURL + "/hourly-forecast"
 		resp.Properties.TimeZone = "America/New_York"
-		resp.Properties.GridId = "OKX"
+		resp.Properties.GridID = "OKX"
 		resp.Properties.GridX = 33
 		resp.Properties.GridY = 37
 		w.Header().Set("Content-Type", "application/geo+json")
@@ -638,8 +638,8 @@ func TestFetchNWSPoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if data.Properties.GridId != "OKX" {
-		t.Errorf("gridId = %q", data.Properties.GridId)
+	if data.Properties.GridID != "OKX" {
+		t.Errorf("gridId = %q", data.Properties.GridID)
 	}
 }
 
@@ -1706,7 +1706,7 @@ func TestHandleForecast_NWSGridpointError(t *testing.T) {
 		resp.Properties.Forecast = srvURL + "/daily-forecast"
 		resp.Properties.ForecastHourly = srvURL + "/hourly-forecast"
 		resp.Properties.TimeZone = "America/New_York"
-		resp.Properties.GridId = "OKX"
+		resp.Properties.GridID = "OKX"
 		resp.Properties.GridX = 33
 		resp.Properties.GridY = 37
 		json.NewEncoder(w).Encode(resp)
@@ -1752,7 +1752,7 @@ func TestHandleForecast_NWSEmptyTimezone(t *testing.T) {
 		resp.Properties.Forecast = srvURL + "/daily-forecast"
 		resp.Properties.ForecastHourly = srvURL + "/hourly-forecast"
 		resp.Properties.TimeZone = "" // empty timezone
-		resp.Properties.GridId = "OKX"
+		resp.Properties.GridID = "OKX"
 		resp.Properties.GridX = 33
 		resp.Properties.GridY = 37
 		json.NewEncoder(w).Encode(resp)
@@ -1794,7 +1794,7 @@ func TestHandleForecast_NWSDailyError_FallbackToOpenMeteo(t *testing.T) {
 		resp.Properties.Forecast = srvURL + "/daily-forecast"
 		resp.Properties.ForecastHourly = srvURL + "/hourly-forecast"
 		resp.Properties.TimeZone = "America/New_York"
-		resp.Properties.GridId = "OKX"
+		resp.Properties.GridID = "OKX"
 		resp.Properties.GridX = 33
 		resp.Properties.GridY = 37
 		json.NewEncoder(w).Encode(resp)
@@ -1829,7 +1829,7 @@ func TestHandleForecast_NWSHourlyError_FallbackToOpenMeteo(t *testing.T) {
 		resp.Properties.Forecast = srvURL + "/daily-forecast"
 		resp.Properties.ForecastHourly = srvURL + "/hourly-forecast"
 		resp.Properties.TimeZone = "America/New_York"
-		resp.Properties.GridId = "OKX"
+		resp.Properties.GridID = "OKX"
 		resp.Properties.GridX = 33
 		resp.Properties.GridY = 37
 		json.NewEncoder(w).Encode(resp)
@@ -1978,7 +1978,7 @@ func TestHandleDayForecast_NWSEmptyTimezone(t *testing.T) {
 		resp.Properties.Forecast = srvURL + "/daily-forecast"
 		resp.Properties.ForecastHourly = srvURL + "/hourly-forecast"
 		resp.Properties.TimeZone = ""
-		resp.Properties.GridId = "OKX"
+		resp.Properties.GridID = "OKX"
 		resp.Properties.GridX = 33
 		resp.Properties.GridY = 37
 		json.NewEncoder(w).Encode(resp)
@@ -2031,7 +2031,7 @@ func TestHandleDayForecast_NWSDailyError_Fallback(t *testing.T) {
 		resp.Properties.Forecast = srvURL + "/daily-forecast"
 		resp.Properties.ForecastHourly = srvURL + "/hourly-forecast"
 		resp.Properties.TimeZone = "America/New_York"
-		resp.Properties.GridId = "OKX"
+		resp.Properties.GridID = "OKX"
 		resp.Properties.GridX = 33
 		resp.Properties.GridY = 37
 		json.NewEncoder(w).Encode(resp)
@@ -2066,7 +2066,7 @@ func TestHandleDayForecast_NWSHourlyError_Fallback(t *testing.T) {
 		resp.Properties.Forecast = srvURL + "/daily-forecast"
 		resp.Properties.ForecastHourly = srvURL + "/hourly-forecast"
 		resp.Properties.TimeZone = "America/New_York"
-		resp.Properties.GridId = "OKX"
+		resp.Properties.GridID = "OKX"
 		resp.Properties.GridX = 33
 		resp.Properties.GridY = 37
 		json.NewEncoder(w).Encode(resp)
@@ -2101,7 +2101,7 @@ func TestHandleDayForecast_NWSGridpointError(t *testing.T) {
 		resp.Properties.Forecast = srvURL + "/daily-forecast"
 		resp.Properties.ForecastHourly = srvURL + "/hourly-forecast"
 		resp.Properties.TimeZone = "America/New_York"
-		resp.Properties.GridId = "OKX"
+		resp.Properties.GridID = "OKX"
 		resp.Properties.GridX = 33
 		resp.Properties.GridY = 37
 		json.NewEncoder(w).Encode(resp)

@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	_ "time/tzdata"
 )
 
@@ -66,7 +67,7 @@ type NWSPointsResponse struct {
 		Forecast       string `json:"forecast"`
 		ForecastHourly string `json:"forecastHourly"`
 		TimeZone       string `json:"timeZone"`
-		GridId         string `json:"gridId"`
+		GridID         string `json:"gridId"`
 		GridX          int    `json:"gridX"`
 		GridY          int    `json:"gridY"`
 	} `json:"properties"`
@@ -381,8 +382,8 @@ func fetchNWSForecast(forecastURL string) (*NWSForecastResponse, error) {
 	return &data, nil
 }
 
-func (s *server) fetchNWSGridpoint(gridId string, gridX, gridY int) (*NWSGridpointResponse, error) {
-	apiURL := fmt.Sprintf(s.nwsBaseURL+"/gridpoints/%s/%d,%d", gridId, gridX, gridY)
+func (s *server) fetchNWSGridpoint(gridID string, gridX, gridY int) (*NWSGridpointResponse, error) {
+	apiURL := fmt.Sprintf(s.nwsBaseURL+"/gridpoints/%s/%d,%d", gridID, gridX, gridY)
 	var data NWSGridpointResponse
 	if err := fetchNWSJSON(apiURL, &data); err != nil {
 		return nil, err
@@ -750,11 +751,11 @@ func (s *server) transformNWSDaily(periods []NWSPeriod, timezone string) ([]Dail
 	return rows, int(math.Round(globalMin)), int(math.Round(globalMax))
 }
 
+var iso8601DurationRe = regexp.MustCompile(`PT(\d+)H`)
+
 // parseISO8601Duration parses durations like "PT6H" and returns hours
 func parseISO8601Duration(dur string) int {
-	// Match patterns like PT6H, PT1H, PT12H
-	re := regexp.MustCompile(`PT(\d+)H`)
-	matches := re.FindStringSubmatch(dur)
+	matches := iso8601DurationRe.FindStringSubmatch(dur)
 	if len(matches) == 2 {
 		hours, _ := strconv.Atoi(matches[1])
 		return hours
@@ -1120,7 +1121,7 @@ func (s *server) handleDayForecast(w http.ResponseWriter, r *http.Request) {
 		days, _, _ := s.transformNWSDaily(daily.Properties.Periods, timezone)
 
 		// Update precip with QPF if available
-		gridpoint, err := s.fetchNWSGridpoint(nwsPoints.Properties.GridId, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
+		gridpoint, err := s.fetchNWSGridpoint(nwsPoints.Properties.GridID, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
 		if err == nil {
 			loc, _ := time.LoadLocation(timezone)
 			if loc == nil {
@@ -1270,7 +1271,7 @@ func (s *server) handleForecast(w http.ResponseWriter, r *http.Request) {
 		// Fetch gridpoint data for quantitative precipitation
 		var precip []PrecipEntry
 		var totalPrecip string
-		gridpoint, err := s.fetchNWSGridpoint(nwsPoints.Properties.GridId, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
+		gridpoint, err := s.fetchNWSGridpoint(nwsPoints.Properties.GridID, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
 		if err == nil {
 			// Extract dates from days for aggregation
 			loc, _ := time.LoadLocation(timezone)
@@ -1467,10 +1468,10 @@ func (s *server) handleNearby(w http.ResponseWriter, r *http.Request) {
 		dist   float64
 	}
 	var nearby []resultWithDist
-	for _, r := range data.Results {
-		d := haversine(userLat, userLon, r.Latitude, r.Longitude)
+	for _, gr := range data.Results {
+		d := haversine(userLat, userLon, gr.Latitude, gr.Longitude)
 		if d <= 200 {
-			nearby = append(nearby, resultWithDist{r, d})
+			nearby = append(nearby, resultWithDist{gr, d})
 		}
 	}
 	sort.Slice(nearby, func(i, j int) bool { return nearby[i].dist < nearby[j].dist })
