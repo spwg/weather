@@ -190,6 +190,10 @@ type ErrorData struct {
 	Message string
 }
 
+type BaseData struct {
+	DevMode bool
+}
+
 type NominatimResult struct {
 	Name    string `json:"name"`
 	Address struct {
@@ -1209,7 +1213,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	templates.ExecuteTemplate(w, "base.html", nil)
+	templates.ExecuteTemplate(w, "base.html", BaseData{
+		DevMode: os.Getenv("DEV") == "1",
+	})
 }
 
 func handleForecast(w http.ResponseWriter, r *http.Request) {

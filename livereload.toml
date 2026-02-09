@@ -1,0 +1,5 @@
+build = "go build -o weather ."
+run = "DEV=1 ./weather"
+watch = ["."]
+ignore = [".git", ".playwright-*", "*.png", "*.yaml", "*.yml", "weather"]
+health_url = "http://localhost:8080/"

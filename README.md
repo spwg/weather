@@ -40,6 +40,22 @@ go run main.go
 
 Open http://localhost:8080
 
+## Development
+
+For auto-rebuild and browser refresh on file changes, install [livereload](https://github.com/spwg/livereload):
+
+```
+go install github.com/spwg/livereload@latest
+```
+
+Then run in a separate terminal:
+
+```
+livereload
+```
+
+This runs continuously, watching for changes to `.go` files and templates. On each change it rebuilds the server and triggers a browser reload. The `DEV=1` environment variable is set automatically, which enables the livereload script in the HTML.
+
 ## Deploying
 
 Hosted on [Fly.io](https://fly.io/) using the included `Dockerfile` and `fly.toml`.
@@ -76,6 +92,7 @@ All data transforms (zipping parallel arrays, computing temperature bar percenta
 ```
 main.go              Server, routes, API calls, data transforms
 go.mod               Module file (no external deps)
+livereload.toml      Dev server config (auto-rebuild + browser refresh)
 Dockerfile           Multi-stage build (compile + alpine runtime)
 fly.toml             Fly.io deployment config
 templates/
