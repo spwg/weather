@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata"
 )
 
 // Open-Meteo API response structs
