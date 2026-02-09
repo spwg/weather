@@ -209,7 +209,14 @@ type NearbyData struct {
 	Lon     string
 }
 
-var templates *template.Template
+type server struct {
+	now              func() time.Time
+	openMeteoBaseURL string
+	geocodeBaseURL   string
+	nwsBaseURL       string
+	nominatimBaseURL string
+	templates        *template.Template
+}
 
 var wmoDescriptions = map[int]string{
 	0: "Clear", 1: "Mostly Clear", 2: "Partly Cloudy", 3: "Overcast",
@@ -307,9 +314,9 @@ func fetchJSON(apiURL string, target any) error {
 	return json.NewDecoder(resp.Body).Decode(target)
 }
 
-func fetchForecast(lat, lon string) (*ForecastResponse, error) {
+func (s *server) fetchForecast(lat, lon string) (*ForecastResponse, error) {
 	apiURL := fmt.Sprintf(
-		"https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s"+
+		s.openMeteoBaseURL+"/v1/forecast?latitude=%s&longitude=%s"+
 			"&hourly=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,weather_code"+
 			"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code"+
 			"&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch"+
@@ -323,9 +330,9 @@ func fetchForecast(lat, lon string) (*ForecastResponse, error) {
 	return &data, nil
 }
 
-func fetchGeocode(query string) (*GeocodeResponse, error) {
+func (s *server) fetchGeocode(query string) (*GeocodeResponse, error) {
 	apiURL := fmt.Sprintf(
-		"https://geocoding-api.open-meteo.com/v1/search?name=%s&count=5&language=en&format=json",
+		s.geocodeBaseURL+"/v1/search?name=%s&count=5&language=en&format=json",
 		url.QueryEscape(query),
 	)
 	var data GeocodeResponse
@@ -356,8 +363,8 @@ func fetchNWSJSON(apiURL string, target any) error {
 	return json.NewDecoder(resp.Body).Decode(target)
 }
 
-func fetchNWSPoints(lat, lon string) (*NWSPointsResponse, error) {
-	apiURL := fmt.Sprintf("https://api.weather.gov/points/%s,%s", lat, lon)
+func (s *server) fetchNWSPoints(lat, lon string) (*NWSPointsResponse, error) {
+	apiURL := fmt.Sprintf(s.nwsBaseURL+"/points/%s,%s", lat, lon)
 	var data NWSPointsResponse
 	if err := fetchNWSJSON(apiURL, &data); err != nil {
 		return nil, err
@@ -373,8 +380,8 @@ func fetchNWSForecast(forecastURL string) (*NWSForecastResponse, error) {
 	return &data, nil
 }
 
-func fetchNWSGridpoint(gridId string, gridX, gridY int) (*NWSGridpointResponse, error) {
-	apiURL := fmt.Sprintf("https://api.weather.gov/gridpoints/%s/%d,%d", gridId, gridX, gridY)
+func (s *server) fetchNWSGridpoint(gridId string, gridX, gridY int) (*NWSGridpointResponse, error) {
+	apiURL := fmt.Sprintf(s.nwsBaseURL+"/gridpoints/%s/%d,%d", gridId, gridX, gridY)
 	var data NWSGridpointResponse
 	if err := fetchNWSJSON(apiURL, &data); err != nil {
 		return nil, err
@@ -382,9 +389,9 @@ func fetchNWSGridpoint(gridId string, gridX, gridY int) (*NWSGridpointResponse, 
 	return &data, nil
 }
 
-func reverseGeocode(lat, lon string) (string, error) {
+func (s *server) reverseGeocode(lat, lon string) (string, error) {
 	apiURL := fmt.Sprintf(
-		"https://nominatim.openstreetmap.org/reverse?lat=%s&lon=%s&format=json&zoom=10",
+		s.nominatimBaseURL+"/reverse?lat=%s&lon=%s&format=json&zoom=10",
 		url.QueryEscape(lat), url.QueryEscape(lon),
 	)
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -450,12 +457,12 @@ func geocodeToSearchResults(results []GeocodeResult) []SearchResult {
 	return out
 }
 
-func transformHourly(data *ForecastResponse) []HourlyRow {
+func (s *server) transformHourly(data *ForecastResponse) []HourlyRow {
 	loc, err := time.LoadLocation(data.Timezone)
 	if err != nil {
 		loc = time.UTC
 	}
-	now := time.Now().In(loc)
+	now := s.now().In(loc)
 
 	var rows []HourlyRow
 	for i, ts := range data.Hourly.Time {
@@ -484,12 +491,12 @@ func transformHourly(data *ForecastResponse) []HourlyRow {
 	return rows
 }
 
-func transformDaily(data *ForecastResponse) ([]DailyRow, int, int) {
+func (s *server) transformDaily(data *ForecastResponse) ([]DailyRow, int, int) {
 	loc, err := time.LoadLocation(data.Timezone)
 	if err != nil {
 		loc = time.UTC
 	}
-	today := time.Now().In(loc).Format("2006-01-02")
+	today := s.now().In(loc).Format("2006-01-02")
 
 	// Find global min/max for bar scaling
 	globalMin := math.Inf(1)
@@ -581,12 +588,12 @@ func calcPrecipAccum(data *ForecastResponse) ([]PrecipEntry, string) {
 
 // NWS transformation functions
 
-func transformNWSHourly(periods []NWSPeriod, timezone string) []HourlyRow {
+func (s *server) transformNWSHourly(periods []NWSPeriod, timezone string) []HourlyRow {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		loc = time.UTC
 	}
-	now := time.Now().In(loc)
+	now := s.now().In(loc)
 
 	var rows []HourlyRow
 	for _, p := range periods {
@@ -622,12 +629,12 @@ func transformNWSHourly(periods []NWSPeriod, timezone string) []HourlyRow {
 	return rows
 }
 
-func transformNWSDaily(periods []NWSPeriod, timezone string) ([]DailyRow, int, int) {
+func (s *server) transformNWSDaily(periods []NWSPeriod, timezone string) ([]DailyRow, int, int) {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		loc = time.UTC
 	}
-	today := time.Now().In(loc).Format("2006-01-02")
+	today := s.now().In(loc).Format("2006-01-02")
 
 	// Group periods by date, extracting high (daytime) and low (nighttime)
 	type dayData struct {
@@ -856,7 +863,7 @@ func distributeQPFToHours(gridData *NWSGridpointResponse, targetDate string, tim
 	return hourlyPrecip
 }
 
-func calcNWSPrecipWithQPF(days []DailyRow, precipByDay map[string]float64, timezone string) ([]PrecipEntry, string) {
+func (s *server) calcNWSPrecipWithQPF(days []DailyRow, precipByDay map[string]float64, timezone string) ([]PrecipEntry, string) {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		loc = time.UTC
@@ -874,7 +881,7 @@ func calcNWSPrecipWithQPF(days []DailyRow, precipByDay map[string]float64, timez
 			continue
 		}
 		// Set year to current year
-		now := time.Now().In(loc)
+		now := s.now().In(loc)
 		t = time.Date(now.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 		dateStr := t.Format("2006-01-02")
 
@@ -892,7 +899,7 @@ func calcNWSPrecipWithQPF(days []DailyRow, precipByDay map[string]float64, timez
 		if err != nil {
 			continue
 		}
-		now := time.Now().In(loc)
+		now := s.now().In(loc)
 		t = time.Date(now.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 		dateStr := t.Format("2006-01-02")
 
@@ -950,12 +957,12 @@ func calcNWSPrecip(days []DailyRow) ([]PrecipEntry, string) {
 }
 
 // transformHourlyForDay filters Open-Meteo hourly data to a specific date
-func transformHourlyForDay(data *ForecastResponse, targetDate string) []HourlyRow {
+func (s *server) transformHourlyForDay(data *ForecastResponse, targetDate string) []HourlyRow {
 	loc, err := time.LoadLocation(data.Timezone)
 	if err != nil {
 		loc = time.UTC
 	}
-	now := time.Now().In(loc)
+	now := s.now().In(loc)
 	today := now.Format("2006-01-02")
 
 	var rows []HourlyRow
@@ -988,12 +995,12 @@ func transformHourlyForDay(data *ForecastResponse, targetDate string) []HourlyRo
 }
 
 // transformNWSHourlyForDay filters NWS hourly periods to a specific date
-func transformNWSHourlyForDay(periods []NWSPeriod, timezone string, targetDate string) []HourlyRow {
+func (s *server) transformNWSHourlyForDay(periods []NWSPeriod, timezone string, targetDate string) []HourlyRow {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		loc = time.UTC
 	}
-	now := time.Now().In(loc)
+	now := s.now().In(loc)
 	today := now.Format("2006-01-02")
 
 	var rows []HourlyRow
@@ -1058,21 +1065,21 @@ func getAdjacentDates(days []DailyRow, targetDate string) (prev, next string) {
 	return
 }
 
-func handleDayForecast(w http.ResponseWriter, r *http.Request) {
+func (s *server) handleDayForecast(w http.ResponseWriter, r *http.Request) {
 	lat := r.URL.Query().Get("lat")
 	lon := r.URL.Query().Get("lon")
 	name := r.URL.Query().Get("name")
 	dayParam := r.URL.Query().Get("day")
 
 	if lat == "" || lon == "" || dayParam == "" {
-		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Missing parameters"})
+		s.templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Missing parameters"})
 		return
 	}
 
 	// Parse the target date
 	targetDate, err := time.Parse("2006-01-02", dayParam)
 	if err != nil {
-		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Invalid date format"})
+		s.templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Invalid date format"})
 		return
 	}
 
@@ -1085,7 +1092,7 @@ func handleDayForecast(w http.ResponseWriter, r *http.Request) {
 	dfd.DateShort = targetDate.Format("Mon 01/02")
 
 	// Try NWS API first (for US locations)
-	nwsPoints, err := fetchNWSPoints(lat, lon)
+	nwsPoints, err := s.fetchNWSPoints(lat, lon)
 	if err == nil {
 		// NWS succeeded - this is a US location
 		log.Printf("Using NWS API for day forecast %s,%s day=%s", lat, lon, dayParam)
@@ -1109,16 +1116,16 @@ func handleDayForecast(w http.ResponseWriter, r *http.Request) {
 		dfd.Timezone = timezone
 
 		// Get daily rows for summary and navigation
-		days, _, _ := transformNWSDaily(daily.Properties.Periods, timezone)
+		days, _, _ := s.transformNWSDaily(daily.Properties.Periods, timezone)
 
 		// Update precip with QPF if available
-		gridpoint, err := fetchNWSGridpoint(nwsPoints.Properties.GridId, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
+		gridpoint, err := s.fetchNWSGridpoint(nwsPoints.Properties.GridId, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
 		if err == nil {
 			loc, _ := time.LoadLocation(timezone)
 			if loc == nil {
 				loc = time.UTC
 			}
-			now := time.Now().In(loc)
+			now := s.now().In(loc)
 			var dates []string
 			for _, d := range days {
 				t, err := time.ParseInLocation("Mon 01/02", d.Date, loc)
@@ -1139,13 +1146,13 @@ func handleDayForecast(w http.ResponseWriter, r *http.Request) {
 		// Find the summary for the target day
 		summary := getDailyRowForDate(days, dayParam)
 		if summary == nil {
-			templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Day not found in forecast"})
+			s.templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Day not found in forecast"})
 			return
 		}
 		dfd.Summary = *summary
 
 		// Get hourly data for this day
-		dfd.Hours = transformNWSHourlyForDay(hourly.Properties.Periods, timezone, dayParam)
+		dfd.Hours = s.transformNWSHourlyForDay(hourly.Properties.Periods, timezone, dayParam)
 
 		// Overlay QPF precipitation amounts onto hourly rows
 		if gridpoint != nil {
@@ -1166,7 +1173,7 @@ func handleDayForecast(w http.ResponseWriter, r *http.Request) {
 			dfd.Name = name
 		}
 
-		templates.ExecuteTemplate(w, "day.html", dfd)
+		s.templates.ExecuteTemplate(w, "day.html", dfd)
 		return
 	}
 
@@ -1174,28 +1181,28 @@ func handleDayForecast(w http.ResponseWriter, r *http.Request) {
 
 openMeteoDayForecast:
 	// Fallback to Open-Meteo
-	data, err := fetchForecast(lat, lon)
+	data, err := s.fetchForecast(lat, lon)
 	if err != nil {
 		log.Printf("Open-Meteo forecast error: %v", err)
-		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Weather data unavailable"})
+		s.templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Weather data unavailable"})
 		return
 	}
 
 	dfd.Timezone = data.Timezone
 
 	// Get daily rows for summary and navigation
-	days, _, _ := transformDaily(data)
+	days, _, _ := s.transformDaily(data)
 
 	// Find the summary for the target day
 	summary := getDailyRowForDate(days, dayParam)
 	if summary == nil {
-		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Day not found in forecast"})
+		s.templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Day not found in forecast"})
 		return
 	}
 	dfd.Summary = *summary
 
 	// Get hourly data for this day
-	dfd.Hours = transformHourlyForDay(data, dayParam)
+	dfd.Hours = s.transformHourlyForDay(data, dayParam)
 
 	// Get adjacent days for navigation
 	dfd.PrevDay, dfd.NextDay = getAdjacentDates(days, dayParam)
@@ -1205,26 +1212,26 @@ openMeteoDayForecast:
 		dfd.Name = name
 	}
 
-	templates.ExecuteTemplate(w, "day.html", dfd)
+	s.templates.ExecuteTemplate(w, "day.html", dfd)
 }
 
-func handleIndex(w http.ResponseWriter, r *http.Request) {
+func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	templates.ExecuteTemplate(w, "base.html", BaseData{
+	s.templates.ExecuteTemplate(w, "base.html", BaseData{
 		DevMode: os.Getenv("DEV") == "1",
 	})
 }
 
-func handleForecast(w http.ResponseWriter, r *http.Request) {
+func (s *server) handleForecast(w http.ResponseWriter, r *http.Request) {
 	lat := r.URL.Query().Get("lat")
 	lon := r.URL.Query().Get("lon")
 	name := r.URL.Query().Get("name")
 
 	if lat == "" || lon == "" {
-		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Missing coordinates"})
+		s.templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Missing coordinates"})
 		return
 	}
 
@@ -1234,7 +1241,7 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 	fd.Name = name
 
 	// Try NWS API first (for US locations)
-	nwsPoints, err := fetchNWSPoints(lat, lon)
+	nwsPoints, err := s.fetchNWSPoints(lat, lon)
 	if err == nil {
 		// NWS succeeded - this is a US location
 		log.Printf("Using NWS API for %s,%s", lat, lon)
@@ -1256,20 +1263,20 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 			timezone = "America/New_York"
 		}
 
-		allHours := transformNWSHourly(hourly.Properties.Periods, timezone)
-		days, globalLow, globalHigh := transformNWSDaily(daily.Properties.Periods, timezone)
+		allHours := s.transformNWSHourly(hourly.Properties.Periods, timezone)
+		days, globalLow, globalHigh := s.transformNWSDaily(daily.Properties.Periods, timezone)
 
 		// Fetch gridpoint data for quantitative precipitation
 		var precip []PrecipEntry
 		var totalPrecip string
-		gridpoint, err := fetchNWSGridpoint(nwsPoints.Properties.GridId, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
+		gridpoint, err := s.fetchNWSGridpoint(nwsPoints.Properties.GridId, nwsPoints.Properties.GridX, nwsPoints.Properties.GridY)
 		if err == nil {
 			// Extract dates from days for aggregation
 			loc, _ := time.LoadLocation(timezone)
 			if loc == nil {
 				loc = time.UTC
 			}
-			now := time.Now().In(loc)
+			now := s.now().In(loc)
 			var dates []string
 			for _, d := range days {
 				// Parse "Mon 01/02" format
@@ -1280,7 +1287,7 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			precipByDay := aggregateNWSPrecipByDay(gridpoint, dates, timezone)
-			precip, totalPrecip = calcNWSPrecipWithQPF(days, precipByDay, timezone)
+			precip, totalPrecip = s.calcNWSPrecipWithQPF(days, precipByDay, timezone)
 
 			// Also update the daily rows with actual precip values
 			for i := range days {
@@ -1349,7 +1356,7 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 			GlobalHigh:     globalHigh,
 		}
 
-		templates.ExecuteTemplate(w, "forecast.html", fd)
+		s.templates.ExecuteTemplate(w, "forecast.html", fd)
 		return
 	}
 
@@ -1357,15 +1364,15 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 
 openMeteo:
 	// Fallback to Open-Meteo (for non-US or NWS failures)
-	data, err := fetchForecast(lat, lon)
+	data, err := s.fetchForecast(lat, lon)
 	if err != nil {
 		log.Printf("Open-Meteo forecast error: %v", err)
-		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Weather data unavailable"})
+		s.templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Weather data unavailable"})
 		return
 	}
 
-	allHours := transformHourly(data)
-	days, globalLow, globalHigh := transformDaily(data)
+	allHours := s.transformHourly(data)
+	days, globalLow, globalHigh := s.transformDaily(data)
 	precip, totalPrecip := calcPrecipAccum(data)
 
 	if name == "" {
@@ -1403,53 +1410,53 @@ openMeteo:
 		GlobalHigh:     globalHigh,
 	}
 
-	templates.ExecuteTemplate(w, "forecast.html", fd)
+	s.templates.ExecuteTemplate(w, "forecast.html", fd)
 }
 
-func handleSearch(w http.ResponseWriter, r *http.Request) {
+func (s *server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	if len(q) < 2 {
 		w.Write([]byte(""))
 		return
 	}
 
-	data, err := fetchGeocode(q)
+	data, err := s.fetchGeocode(q)
 	if err != nil || len(data.Results) == 0 {
 		w.Write([]byte(`<div class="search-empty">No results</div>`))
 		return
 	}
 
-	templates.ExecuteTemplate(w, "search.html", SearchData{
+	s.templates.ExecuteTemplate(w, "search.html", SearchData{
 		Results: geocodeToSearchResults(data.Results),
 		Query:   q,
 	})
 }
 
-func handleNearby(w http.ResponseWriter, r *http.Request) {
+func (s *server) handleNearby(w http.ResponseWriter, r *http.Request) {
 	lat := r.URL.Query().Get("lat")
 	lon := r.URL.Query().Get("lon")
 	if lat == "" || lon == "" {
-		templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Missing coordinates"})
+		s.templates.ExecuteTemplate(w, "error.html", ErrorData{Message: "Missing coordinates"})
 		return
 	}
 
-	cityName, err := reverseGeocode(lat, lon)
+	cityName, err := s.reverseGeocode(lat, lon)
 	if err != nil || cityName == "" {
 		log.Printf("reverse geocode failed: %v", err)
-		handleForecast(w, r)
+		s.handleForecast(w, r)
 		return
 	}
 
-	data, err := fetchGeocode(cityName)
+	data, err := s.fetchGeocode(cityName)
 	if err != nil || len(data.Results) == 0 {
-		handleForecast(w, r)
+		s.handleForecast(w, r)
 		return
 	}
 
 	userLat, err1 := strconv.ParseFloat(lat, 64)
 	userLon, err2 := strconv.ParseFloat(lon, 64)
 	if err1 != nil || err2 != nil {
-		handleForecast(w, r)
+		s.handleForecast(w, r)
 		return
 	}
 
@@ -1468,7 +1475,7 @@ func handleNearby(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(nearby, func(i, j int) bool { return nearby[i].dist < nearby[j].dist })
 
 	if len(nearby) == 0 {
-		handleForecast(w, r)
+		s.handleForecast(w, r)
 		return
 	}
 
@@ -1477,7 +1484,7 @@ func handleNearby(w http.ResponseWriter, r *http.Request) {
 		filtered = append(filtered, n.result)
 	}
 
-	templates.ExecuteTemplate(w, "nearby.html", NearbyData{
+	s.templates.ExecuteTemplate(w, "nearby.html", NearbyData{
 		Results: geocodeToSearchResults(filtered),
 		Lat:     lat,
 		Lon:     lon,
@@ -1488,14 +1495,22 @@ func main() {
 	funcMap := template.FuncMap{
 		"gt": func(a, b float64) bool { return a > b },
 	}
+	tmpl := template.Must(template.New("").Funcs(funcMap).ParseGlob("templates/*.html"))
 
-	templates = template.Must(template.New("").Funcs(funcMap).ParseGlob("templates/*.html"))
+	s := &server{
+		now:              time.Now,
+		openMeteoBaseURL: "https://api.open-meteo.com",
+		geocodeBaseURL:   "https://geocoding-api.open-meteo.com",
+		nwsBaseURL:       "https://api.weather.gov",
+		nominatimBaseURL: "https://nominatim.openstreetmap.org",
+		templates:        tmpl,
+	}
 
-	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/forecast", handleForecast)
-	http.HandleFunc("/day-forecast", handleDayForecast)
-	http.HandleFunc("/search", handleSearch)
-	http.HandleFunc("/nearby", handleNearby)
+	http.HandleFunc("/", s.handleIndex)
+	http.HandleFunc("/forecast", s.handleForecast)
+	http.HandleFunc("/day-forecast", s.handleDayForecast)
+	http.HandleFunc("/search", s.handleSearch)
+	http.HandleFunc("/nearby", s.handleNearby)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	port := os.Getenv("PORT")
