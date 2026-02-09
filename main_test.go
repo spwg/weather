@@ -69,7 +69,7 @@ func makeOpenMeteoForecastResponse() ForecastResponse {
 			ApparentTemp:  apparent,
 			Precipitation: precip,
 			WindSpeed:     wind,
-			WindDirection:  windDir,
+			WindDirection: windDir,
 			WeatherCode:   codes,
 		},
 		Daily: DailyData{
@@ -83,18 +83,30 @@ func makeOpenMeteoForecastResponse() ForecastResponse {
 	}
 }
 
-func intPtr(v int) *int       { return &v }
+func intPtr(v int) *int           { return &v }
 func floatPtr(v float64) *float64 { return &v }
 
 // makeNWSPeriods creates NWS daily forecast periods.
 func makeNWSDailyPeriods() []NWSPeriod {
 	return []NWSPeriod{
-		{Number: 1, Name: "Sunday", StartTime: "2026-02-08T06:00:00-05:00", IsDaytime: true, Temperature: 42, WindSpeed: "10 mph", WindDirection: "NW", ShortForecast: "Partly Cloudy", ProbabilityOfPrecipitation: struct{ Value *int `json:"value"` }{intPtr(20)}},
-		{Number: 2, Name: "Sunday Night", StartTime: "2026-02-08T18:00:00-05:00", IsDaytime: false, Temperature: 28, WindSpeed: "5 mph", WindDirection: "N", ShortForecast: "Clear", ProbabilityOfPrecipitation: struct{ Value *int `json:"value"` }{intPtr(0)}},
-		{Number: 3, Name: "Monday", StartTime: "2026-02-09T06:00:00-05:00", IsDaytime: true, Temperature: 45, WindSpeed: "12 mph", WindDirection: "SW", ShortForecast: "Sunny", ProbabilityOfPrecipitation: struct{ Value *int `json:"value"` }{intPtr(10)}},
-		{Number: 4, Name: "Monday Night", StartTime: "2026-02-09T18:00:00-05:00", IsDaytime: false, Temperature: 30, WindSpeed: "8 mph", WindDirection: "W", ShortForecast: "Mostly Clear", ProbabilityOfPrecipitation: struct{ Value *int `json:"value"` }{intPtr(5)}},
-		{Number: 5, Name: "Tuesday", StartTime: "2026-02-10T06:00:00-05:00", IsDaytime: true, Temperature: 50, WindSpeed: "15 mph", WindDirection: "S", ShortForecast: "Rain", ProbabilityOfPrecipitation: struct{ Value *int `json:"value"` }{intPtr(80)}},
-		{Number: 6, Name: "Tuesday Night", StartTime: "2026-02-10T18:00:00-05:00", IsDaytime: false, Temperature: 35, WindSpeed: "10 mph", WindDirection: "SE", ShortForecast: "Rain Likely", ProbabilityOfPrecipitation: struct{ Value *int `json:"value"` }{intPtr(60)}},
+		{Number: 1, Name: "Sunday", StartTime: "2026-02-08T06:00:00-05:00", IsDaytime: true, Temperature: 42, WindSpeed: "10 mph", WindDirection: "NW", ShortForecast: "Partly Cloudy", ProbabilityOfPrecipitation: struct {
+			Value *int `json:"value"`
+		}{intPtr(20)}},
+		{Number: 2, Name: "Sunday Night", StartTime: "2026-02-08T18:00:00-05:00", IsDaytime: false, Temperature: 28, WindSpeed: "5 mph", WindDirection: "N", ShortForecast: "Clear", ProbabilityOfPrecipitation: struct {
+			Value *int `json:"value"`
+		}{intPtr(0)}},
+		{Number: 3, Name: "Monday", StartTime: "2026-02-09T06:00:00-05:00", IsDaytime: true, Temperature: 45, WindSpeed: "12 mph", WindDirection: "SW", ShortForecast: "Sunny", ProbabilityOfPrecipitation: struct {
+			Value *int `json:"value"`
+		}{intPtr(10)}},
+		{Number: 4, Name: "Monday Night", StartTime: "2026-02-09T18:00:00-05:00", IsDaytime: false, Temperature: 30, WindSpeed: "8 mph", WindDirection: "W", ShortForecast: "Mostly Clear", ProbabilityOfPrecipitation: struct {
+			Value *int `json:"value"`
+		}{intPtr(5)}},
+		{Number: 5, Name: "Tuesday", StartTime: "2026-02-10T06:00:00-05:00", IsDaytime: true, Temperature: 50, WindSpeed: "15 mph", WindDirection: "S", ShortForecast: "Rain", ProbabilityOfPrecipitation: struct {
+			Value *int `json:"value"`
+		}{intPtr(80)}},
+		{Number: 6, Name: "Tuesday Night", StartTime: "2026-02-10T18:00:00-05:00", IsDaytime: false, Temperature: 35, WindSpeed: "10 mph", WindDirection: "SE", ShortForecast: "Rain Likely", ProbabilityOfPrecipitation: struct {
+			Value *int `json:"value"`
+		}{intPtr(60)}},
 	}
 }
 
@@ -315,9 +327,9 @@ func TestTempToColor(t *testing.T) {
 
 func TestWindchill(t *testing.T) {
 	tests := []struct {
-		name string
+		name       string
 		temp, wind float64
-		want int
+		want       int
 	}{
 		{"warm temp bypass", 50, 10, 50},
 		{"above 50 bypass", 60, 20, 60},
@@ -1079,8 +1091,12 @@ func TestTransformNWSDaily_ZeroTempRange(t *testing.T) {
 	s := newTestServer(t)
 
 	periods := []NWSPeriod{
-		{StartTime: "2026-02-08T06:00:00+00:00", IsDaytime: true, Temperature: 40, WindSpeed: "5 mph", WindDirection: "N", ShortForecast: "Fair", ProbabilityOfPrecipitation: struct{ Value *int `json:"value"` }{intPtr(0)}},
-		{StartTime: "2026-02-08T18:00:00+00:00", IsDaytime: false, Temperature: 40, WindSpeed: "5 mph", WindDirection: "N", ShortForecast: "Fair", ProbabilityOfPrecipitation: struct{ Value *int `json:"value"` }{intPtr(0)}},
+		{StartTime: "2026-02-08T06:00:00+00:00", IsDaytime: true, Temperature: 40, WindSpeed: "5 mph", WindDirection: "N", ShortForecast: "Fair", ProbabilityOfPrecipitation: struct {
+			Value *int `json:"value"`
+		}{intPtr(0)}},
+		{StartTime: "2026-02-08T18:00:00+00:00", IsDaytime: false, Temperature: 40, WindSpeed: "5 mph", WindDirection: "N", ShortForecast: "Fair", ProbabilityOfPrecipitation: struct {
+			Value *int `json:"value"`
+		}{intPtr(0)}},
 	}
 	rows, _, _ := s.transformNWSDaily(periods, "UTC")
 	if len(rows) != 1 {
@@ -1299,8 +1315,8 @@ func TestAggregateNWSPrecipByDay_InvalidValidTime(t *testing.T) {
 		ValidTime string   `json:"validTime"`
 		Value     *float64 `json:"value"`
 	}{
-		{ValidTime: "bad-format", Value: &val},         // no "/" separator
-		{ValidTime: "bad/PT6H", Value: &val},            // bad timestamp
+		{ValidTime: "bad-format", Value: &val},                // no "/" separator
+		{ValidTime: "bad/PT6H", Value: &val},                  // bad timestamp
 		{ValidTime: "2026-02-08T12:00:00+00:00", Value: &val}, // no duration part (only 1 part after split)
 	}
 	dates := []string{"2026-02-08"}

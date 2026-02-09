@@ -29,22 +29,22 @@ type ForecastResponse struct {
 }
 
 type HourlyData struct {
-	Time              []string  `json:"time"`
-	Temperature       []float64 `json:"temperature_2m"`
-	ApparentTemp      []float64 `json:"apparent_temperature"`
-	Precipitation     []float64 `json:"precipitation"`
-	WindSpeed         []float64 `json:"wind_speed_10m"`
-	WindDirection     []float64 `json:"wind_direction_10m"`
-	WeatherCode       []int     `json:"weather_code"`
+	Time          []string  `json:"time"`
+	Temperature   []float64 `json:"temperature_2m"`
+	ApparentTemp  []float64 `json:"apparent_temperature"`
+	Precipitation []float64 `json:"precipitation"`
+	WindSpeed     []float64 `json:"wind_speed_10m"`
+	WindDirection []float64 `json:"wind_direction_10m"`
+	WeatherCode   []int     `json:"weather_code"`
 }
 
 type DailyData struct {
-	Time             []string  `json:"time"`
-	TempMax          []float64 `json:"temperature_2m_max"`
-	TempMin          []float64 `json:"temperature_2m_min"`
-	PrecipSum        []float64 `json:"precipitation_sum"`
-	WindSpeedMax     []float64 `json:"wind_speed_10m_max"`
-	WeatherCode      []int     `json:"weather_code"`
+	Time         []string  `json:"time"`
+	TempMax      []float64 `json:"temperature_2m_max"`
+	TempMin      []float64 `json:"temperature_2m_min"`
+	PrecipSum    []float64 `json:"precipitation_sum"`
+	WindSpeedMax []float64 `json:"wind_speed_10m_max"`
+	WeatherCode  []int     `json:"weather_code"`
 }
 
 type GeocodeResponse struct {
@@ -180,10 +180,10 @@ type SearchData struct {
 }
 
 type SearchResult struct {
-	Name    string
-	Detail  string
-	Lat     string
-	Lon     string
+	Name     string
+	Detail   string
+	Lat      string
+	Lon      string
 	FullName string
 }
 
@@ -250,15 +250,15 @@ func windDirLabel(degrees float64) string {
 // Color scale: Blue (cold) → White (mild) → Yellow → Orange → Red (hot)
 func tempToColor(temp float64) string {
 	type colorStop struct {
-		temp float64
+		temp    float64
 		r, g, b uint8
 	}
 	stops := []colorStop{
-		{20, 0x4a, 0x9e, 0xff},  // Blue - cold
-		{45, 0xe0, 0xe0, 0xe0},  // White - mild
-		{65, 0xff, 0xd9, 0x3d},  // Yellow - warm
-		{80, 0xff, 0x6b, 0x35},  // Orange - hot
-		{95, 0xff, 0x33, 0x33},  // Red - very hot
+		{20, 0x4a, 0x9e, 0xff}, // Blue - cold
+		{45, 0xe0, 0xe0, 0xe0}, // White - mild
+		{65, 0xff, 0xd9, 0x3d}, // Yellow - warm
+		{80, 0xff, 0x6b, 0x35}, // Orange - hot
+		{95, 0xff, 0x33, 0x33}, // Red - very hot
 	}
 
 	// Clamp to range
