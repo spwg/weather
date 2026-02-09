@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -2246,5 +2248,89 @@ func TestHandleNearby_GeocodeError(t *testing.T) {
 	// Geocode error → falls back to handleForecast
 	if w.Code != 200 {
 		t.Errorf("status = %d, want 200", w.Code)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Request logging middleware
+// ---------------------------------------------------------------------------
+
+func TestResponseRecorderDefaultStatus(t *testing.T) {
+	w := httptest.NewRecorder()
+	rr := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+	rr.Write([]byte("hello"))
+	if rr.statusCode != http.StatusOK {
+		t.Errorf("default statusCode = %d, want %d", rr.statusCode, http.StatusOK)
+	}
+}
+
+func TestResponseRecorderCapturesWriteHeader(t *testing.T) {
+	w := httptest.NewRecorder()
+	rr := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+	rr.WriteHeader(http.StatusNotFound)
+	if rr.statusCode != http.StatusNotFound {
+		t.Errorf("statusCode = %d, want %d", rr.statusCode, http.StatusNotFound)
+	}
+	if w.Code != http.StatusNotFound {
+		t.Errorf("underlying Code = %d, want %d", w.Code, http.StatusNotFound)
+	}
+}
+
+func TestLogRequestLogsFields(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	slog.SetDefault(logger)
+
+	handler := logRequest(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte("ok"))
+	}))
+
+	req := httptest.NewRequest("POST", "/forecast?lat=40&lon=-74", nil)
+	req.Header.Set("User-Agent", "TestAgent/1.0")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	logOutput := buf.String()
+	for _, want := range []string{"http request", "method=POST", "path=/forecast", "lat=40&lon=-74", "status=201", "user_agent=TestAgent/1.0"} {
+		if !strings.Contains(logOutput, want) {
+			t.Errorf("log output missing %q\ngot: %s", want, logOutput)
+		}
+	}
+}
+
+func TestLogRequestDefaultStatusOK(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	slog.SetDefault(logger)
+
+	handler := logRequest(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("no explicit status"))
+	}))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if !strings.Contains(buf.String(), "status=200") {
+		t.Errorf("expected status=200 in log output, got: %s", buf.String())
+	}
+}
+
+func TestLogRequestIncludesDuration(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	slog.SetDefault(logger)
+
+	handler := logRequest(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	}))
+
+	req := httptest.NewRequest("GET", "/search?q=test", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if !strings.Contains(buf.String(), "duration=") {
+		t.Errorf("expected duration in log output, got: %s", buf.String())
 	}
 }

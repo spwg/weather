@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
@@ -1493,6 +1494,35 @@ func (s *server) handleNearby(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// responseRecorder wraps http.ResponseWriter to capture the status code.
+type responseRecorder struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rr *responseRecorder) WriteHeader(code int) {
+	rr.statusCode = code
+	rr.ResponseWriter.WriteHeader(code)
+}
+
+// logRequest is middleware that logs every HTTP request with structured fields.
+func logRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rr := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+		next.ServeHTTP(rr, r)
+		slog.Info("http request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"query", r.URL.RawQuery,
+			"status", rr.statusCode,
+			"duration", time.Since(start),
+			"remote", r.RemoteAddr,
+			"user_agent", r.UserAgent(),
+		)
+	})
+}
+
 func main() {
 	funcMap := template.FuncMap{
 		"gt": func(a, b float64) bool { return a > b },
@@ -1508,12 +1538,13 @@ func main() {
 		templates:        tmpl,
 	}
 
-	http.HandleFunc("/", s.handleIndex)
-	http.HandleFunc("/forecast", s.handleForecast)
-	http.HandleFunc("/day-forecast", s.handleDayForecast)
-	http.HandleFunc("/search", s.handleSearch)
-	http.HandleFunc("/nearby", s.handleNearby)
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", s.handleIndex)
+	mux.HandleFunc("/forecast", s.handleForecast)
+	mux.HandleFunc("/day-forecast", s.handleDayForecast)
+	mux.HandleFunc("/search", s.handleSearch)
+	mux.HandleFunc("/nearby", s.handleNearby)
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -1521,5 +1552,5 @@ func main() {
 	}
 	addr := ":" + port
 	log.Printf("Weather server starting on http://localhost%s", addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	log.Fatal(http.ListenAndServe(addr, logRequest(mux)))
 }
