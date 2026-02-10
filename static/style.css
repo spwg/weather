@@ -53,12 +53,15 @@ h1 {
   position: relative;
   flex: 1;
   max-width: 320px;
+  display: flex;
 }
 
 #search-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background: var(--bg-subtle);
   border: 1px solid var(--border);
+  border-right: none;
   color: var(--fg);
   font-family: var(--font);
   font-size: 13px;
@@ -72,6 +75,21 @@ h1 {
 
 #search-input::placeholder {
   color: var(--fg-muted);
+}
+
+.search-btn {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.search-btn:hover {
+  color: var(--fg);
+  border-color: var(--fg-dim);
 }
 
 .result-name {
