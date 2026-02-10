@@ -1553,16 +1553,16 @@ func TestHandleSearch(t *testing.T) {
 		req := httptest.NewRequest("GET", "/search?q=a", nil)
 		w := httptest.NewRecorder()
 		s.handleSearch(w, req)
-		if w.Body.String() != "" {
-			t.Errorf("expected empty body, got %q", w.Body.String())
+		if !strings.Contains(w.Body.String(), "Search Results") {
+			t.Error("expected search results page")
 		}
 	})
 	t.Run("empty query", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/search?q=", nil)
 		w := httptest.NewRecorder()
 		s.handleSearch(w, req)
-		if w.Body.String() != "" {
-			t.Errorf("expected empty body, got %q", w.Body.String())
+		if !strings.Contains(w.Body.String(), "Search Results") {
+			t.Error("expected search results page")
 		}
 	})
 	t.Run("valid query with results", func(t *testing.T) {

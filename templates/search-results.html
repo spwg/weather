@@ -1,0 +1,19 @@
+{{define "search-results.html"}}
+<div class="search-results-page">
+  <h2>Search Results</h2>
+  <p class="search-results-prompt">{{if .Results}}Showing results for "{{.Query}}":{{else}}No results found for "{{.Query}}".{{end}}</p>
+  {{if .Results}}
+  <ul class="search-results-page-list">
+    {{range .Results}}
+    <li class="search-results-page-item"
+        hx-get="/forecast?lat={{.Lat}}&lon={{.Lon}}&name={{.FullName}}"
+        hx-target="#forecast-container"
+        onclick="setHash('{{.Lat}}','{{.Lon}}','{{.FullName}}');document.getElementById('search-input').value='{{.FullName}}';">
+      <span class="result-name">{{.Name}}</span>
+      <span class="result-detail">{{.Detail}}</span>
+    </li>
+    {{end}}
+  </ul>
+  {{end}}
+</div>
+{{end}}

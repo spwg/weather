@@ -335,7 +335,7 @@ func (s *server) fetchForecast(lat, lon string) (*ForecastResponse, error) {
 
 func (s *server) fetchGeocode(query string) (*GeocodeResponse, error) {
 	apiURL := fmt.Sprintf(
-		s.geocodeBaseURL+"/v1/search?name=%s&count=5&language=en&format=json",
+		s.geocodeBaseURL+"/v1/search?name=%s&count=10&language=en&format=json",
 		url.QueryEscape(query),
 	)
 	var data GeocodeResponse
@@ -1419,17 +1419,21 @@ openMeteo:
 func (s *server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	if len(q) < 2 {
-		w.Write([]byte(""))
+		s.templates.ExecuteTemplate(w, "search-results.html", SearchData{
+			Query: q,
+		})
 		return
 	}
 
 	data, err := s.fetchGeocode(q)
 	if err != nil || len(data.Results) == 0 {
-		w.Write([]byte(`<div class="search-empty">No results</div>`))
+		s.templates.ExecuteTemplate(w, "search-results.html", SearchData{
+			Query: q,
+		})
 		return
 	}
 
-	s.templates.ExecuteTemplate(w, "search.html", SearchData{
+	s.templates.ExecuteTemplate(w, "search-results.html", SearchData{
 		Results: geocodeToSearchResults(data.Results),
 		Query:   q,
 	})
