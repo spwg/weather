@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -195,6 +197,7 @@ type ErrorData struct {
 
 type BaseData struct {
 	DevMode bool
+	CSSHash string
 }
 
 type NominatimResult struct {
@@ -219,6 +222,7 @@ type server struct {
 	nwsBaseURL       string
 	nominatimBaseURL string
 	templates        *template.Template
+	cssHash          string
 }
 
 var wmoDescriptions = map[int]string{
@@ -1225,6 +1229,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	s.templates.ExecuteTemplate(w, "base.html", BaseData{
 		DevMode: os.Getenv("DEV") == "1",
+		CSSHash: s.cssHash,
 	})
 }
 
@@ -1533,6 +1538,13 @@ func main() {
 	}
 	tmpl := template.Must(template.New("").Funcs(funcMap).ParseGlob("templates/*.html"))
 
+	cssBytes, err := os.ReadFile("static/style.css")
+	if err != nil {
+		log.Fatalf("reading static/style.css: %v", err)
+	}
+	h := sha256.Sum256(cssBytes)
+	cssHash := hex.EncodeToString(h[:6])
+
 	s := &server{
 		now:              time.Now,
 		openMeteoBaseURL: "https://api.open-meteo.com",
@@ -1540,6 +1552,7 @@ func main() {
 		nwsBaseURL:       "https://api.weather.gov",
 		nominatimBaseURL: "https://nominatim.openstreetmap.org",
 		templates:        tmpl,
+		cssHash:          cssHash,
 	}
 
 	mux := http.NewServeMux()

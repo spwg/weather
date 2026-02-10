@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -9,6 +11,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -28,9 +31,15 @@ func newTestServer(t *testing.T, opts ...func(*server)) *server {
 	funcMap := template.FuncMap{
 		"gt": func(a, b float64) bool { return a > b },
 	}
+	cssBytes, err := os.ReadFile("static/style.css")
+	if err != nil {
+		t.Fatalf("reading style.css: %v", err)
+	}
+	h := sha256.Sum256(cssBytes)
 	s := &server{
 		now:       fixedTime,
 		templates: template.Must(template.New("").Funcs(funcMap).ParseGlob("templates/*.html")),
+		cssHash:   hex.EncodeToString(h[:6]),
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -1542,6 +1551,15 @@ func TestHandleIndex(t *testing.T) {
 		s.handleIndex(w, req)
 		if w.Code != 404 {
 			t.Errorf("status = %d, want 404", w.Code)
+		}
+	})
+	t.Run("css cache bust", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		w := httptest.NewRecorder()
+		s.handleIndex(w, req)
+		body := w.Body.String()
+		if !strings.Contains(body, "style.css?v=") {
+			t.Error("expected cache-busted CSS link with ?v= parameter")
 		}
 	})
 }
