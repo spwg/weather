@@ -12,17 +12,17 @@
   <header>
     <div class="header-row">
       <h1>WX</h1>
-      <div class="search-container">
+      <form class="search-container" id="search-form" action="/search" method="get"
+            hx-get="/search"
+            hx-trigger="submit"
+            hx-target="#forecast-container"
+            hx-push-url="false">
         <input type="text"
                id="search-input"
                name="q"
                placeholder="Search city..."
-               autocomplete="off"
-               hx-get="/search"
-               hx-trigger="input changed delay:300ms"
-               hx-target="#search-results">
-        <div id="search-results"></div>
-      </div>
+               autocomplete="off">
+      </form>
       <button id="locate-btn" class="locate-btn" onclick="refreshLocation()" title="Use current location"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,11 22,2 13,21 11,13 3,11"/></svg></button>
       <button id="settings-btn" class="settings-btn" onclick="toggleSettings()" title="Settings">&#9881;</button>
     </div>
@@ -121,28 +121,6 @@
       var url = '/forecast?lat=' + lat + '&lon=' + lon;
       if (name) url += '&name=' + encodeURIComponent(name);
       htmx.ajax('GET', url, { target: '#forecast-container' });
-    }
-
-    // --- Search keyboard navigation ---
-
-    var searchActiveIndex = -1;
-
-    function getSearchItems() {
-      return document.querySelectorAll('#search-results .search-results-list li');
-    }
-
-    function updateSearchHighlight() {
-      var items = getSearchItems();
-      for (var i = 0; i < items.length; i++) {
-        if (i === searchActiveIndex) {
-          items[i].classList.add('search-active');
-        } else {
-          items[i].classList.remove('search-active');
-        }
-      }
-      if (searchActiveIndex >= 0 && items[searchActiveIndex]) {
-        items[searchActiveIndex].scrollIntoView({ block: 'nearest' });
-      }
     }
 
     // --- Favorites localStorage API ---
@@ -387,9 +365,6 @@
         startClock();
         applyUnits();
       }
-      if (e.detail.target.id === 'search-results') {
-        searchActiveIndex = -1;
-      }
     });
 
     // --- Back/forward navigation ---
@@ -443,46 +418,21 @@
           '<div class="prompt">Enter a city above to get started.</div>';
       }
 
-      // Close search results when clicking outside
+      // Close settings panel when clicking outside
       document.addEventListener('click', function(e) {
-        if (!e.target.closest('.search-container')) {
-          document.getElementById('search-results').innerHTML = '';
-        }
-        // Close settings panel when clicking outside
         if (!e.target.closest('.settings-panel') && !e.target.closest('.settings-btn')) {
           document.getElementById('settings-panel').classList.remove('open');
         }
       });
 
-      // Close search results and settings on escape
+      // Close settings on escape
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
-          document.getElementById('search-results').innerHTML = '';
           document.getElementById('search-input').blur();
           document.getElementById('settings-panel').classList.remove('open');
         }
       });
 
-      // Arrow key navigation for search results
-      document.getElementById('search-input').addEventListener('keydown', function(e) {
-        var items = getSearchItems();
-        if (items.length === 0) return;
-
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          searchActiveIndex = (searchActiveIndex + 1) % items.length;
-          updateSearchHighlight();
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          searchActiveIndex = (searchActiveIndex - 1 + items.length) % items.length;
-          updateSearchHighlight();
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          if (searchActiveIndex >= 0 && items[searchActiveIndex]) {
-            items[searchActiveIndex].click();
-          }
-        }
-      });
     });
   </script>
 </body>
