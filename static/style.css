@@ -46,20 +46,26 @@ h1 {
   color: var(--accent);
   letter-spacing: 2px;
   flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+}
+
+h1 > * {
+  grid-area: 1 / 1;
 }
 
 .wx-spinner {
-  display: none;
   width: 14px;
   height: 14px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
+  opacity: 0;
 }
 
-h1.loading .wx-text { display: none; }
-h1.loading .wx-spinner { display: inline-block; }
+h1.loading .wx-text { opacity: 0; }
+h1.loading .wx-spinner { opacity: 1; }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
