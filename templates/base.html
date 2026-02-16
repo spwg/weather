@@ -11,7 +11,7 @@
 <body>
   <header>
     <div class="header-row">
-      <h1>WX</h1>
+      <h1 id="wx-logo"><span class="wx-text">WX</span><span class="wx-spinner"></span></h1>
       <form class="search-container" id="search-form" action="/search" method="get"
             hx-get="/search"
             hx-trigger="submit"
@@ -356,6 +356,29 @@
       if (window._clockInterval) clearInterval(window._clockInterval);
       window._clockInterval = setInterval(tick, 1000);
     }
+
+    // --- Network activity indicator ---
+
+    var _pendingRequests = 0;
+
+    function updateLogoState() {
+      var logo = document.getElementById('wx-logo');
+      if (_pendingRequests > 0) {
+        logo.classList.add('loading');
+      } else {
+        logo.classList.remove('loading');
+      }
+    }
+
+    document.body.addEventListener('htmx:beforeRequest', function() {
+      _pendingRequests++;
+      updateLogoState();
+    });
+
+    document.body.addEventListener('htmx:afterRequest', function() {
+      _pendingRequests = Math.max(0, _pendingRequests - 1);
+      updateLogoState();
+    });
 
     // --- htmx afterSwap sync ---
 

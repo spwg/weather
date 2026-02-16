@@ -48,6 +48,23 @@ h1 {
   flex-shrink: 0;
 }
 
+.wx-spinner {
+  display: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+h1.loading .wx-text { display: none; }
+h1.loading .wx-spinner { display: inline-block; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Search */
 .search-container {
   position: relative;
