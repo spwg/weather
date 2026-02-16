@@ -46,6 +46,11 @@ h1 {
   color: var(--accent);
   letter-spacing: 2px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  min-width: 28px;
+  justify-content: center;
 }
 
 .wx-spinner {
