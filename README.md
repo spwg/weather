@@ -2,8 +2,6 @@
 
 Minimal, information-dense weather dashboard. Go backend (stdlib only), htmx frontend, dual weather API support (NWS + Open-Meteo).
 
-![WX weather dashboard showing Austin, Texas forecast](weather-full.png)
-
 ## Features
 
 - **Hourly forecast** for the current day: temperature, feels like, precipitation, wind speed/direction, conditions
