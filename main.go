@@ -37,6 +37,7 @@ type HourlyData struct {
 	Temperature   []float64 `json:"temperature_2m"`
 	ApparentTemp  []float64 `json:"apparent_temperature"`
 	Precipitation []float64 `json:"precipitation"`
+	Humidity      []float64 `json:"relative_humidity_2m"`
 	WindSpeed     []float64 `json:"wind_speed_10m"`
 	WindDirection []float64 `json:"wind_direction_10m"`
 	WeatherCode   []int     `json:"weather_code"`
@@ -94,6 +95,9 @@ type NWSPeriod struct {
 	ProbabilityOfPrecipitation struct {
 		Value *int `json:"value"`
 	} `json:"probabilityOfPrecipitation"`
+	RelativeHumidity struct {
+		Value *int `json:"value"`
+	} `json:"relativeHumidity"`
 }
 
 type NWSGridpointResponse struct {
@@ -114,6 +118,7 @@ type HourlyRow struct {
 	Time      string
 	Temp      int
 	FeelsLike int
+	Humidity  int
 	Precip    string
 	PrecipRaw float64 // raw precipitation in inches, -1 if probability
 	WindSpeed int
@@ -324,7 +329,7 @@ func fetchJSON(apiURL string, target any) error {
 func (s *server) fetchForecast(lat, lon string) (*ForecastResponse, error) {
 	apiURL := fmt.Sprintf(
 		s.openMeteoBaseURL+"/v1/forecast?latitude=%s&longitude=%s"+
-			"&hourly=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,weather_code"+
+			"&hourly=temperature_2m,apparent_temperature,precipitation,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code"+
 			"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code"+
 			"&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch"+
 			"&timezone=auto&forecast_days=7",
@@ -483,10 +488,15 @@ func (s *server) transformHourly(data *ForecastResponse) []HourlyRow {
 		if len(rows) >= 12 {
 			break
 		}
+		var humidity int
+		if i < len(data.Hourly.Humidity) {
+			humidity = int(math.Round(data.Hourly.Humidity[i]))
+		}
 		rows = append(rows, HourlyRow{
 			Time:      t.Format("3 PM"),
 			Temp:      int(math.Round(data.Hourly.Temperature[i])),
 			FeelsLike: int(math.Round(data.Hourly.ApparentTemp[i])),
+			Humidity:  humidity,
 			Precip:    fmt.Sprintf("%.2f\"", data.Hourly.Precipitation[i]),
 			PrecipRaw: data.Hourly.Precipitation[i],
 			WindSpeed: int(math.Round(data.Hourly.WindSpeed[i])),
@@ -621,10 +631,15 @@ func (s *server) transformNWSHourly(periods []NWSPeriod, timezone string) []Hour
 		if p.ProbabilityOfPrecipitation.Value != nil {
 			precip = fmt.Sprintf("%d%%", *p.ProbabilityOfPrecipitation.Value)
 		}
+		var humidity int
+		if p.RelativeHumidity.Value != nil {
+			humidity = *p.RelativeHumidity.Value
+		}
 		rows = append(rows, HourlyRow{
 			Time:      t.Format("3 PM"),
 			Temp:      p.Temperature,
 			FeelsLike: windchill(float64(p.Temperature), windSpeed),
+			Humidity:  humidity,
 			Precip:    precip,
 			PrecipRaw: -1, // NWS hourly uses probability, not amount
 			WindSpeed: int(math.Round(windSpeed)),
@@ -986,10 +1001,15 @@ func (s *server) transformHourlyForDay(data *ForecastResponse, targetDate string
 		if dateStr == today && t.Before(now.Truncate(time.Hour)) {
 			continue
 		}
+		var humidity int
+		if i < len(data.Hourly.Humidity) {
+			humidity = int(math.Round(data.Hourly.Humidity[i]))
+		}
 		rows = append(rows, HourlyRow{
 			Time:      t.Format("3 PM"),
 			Temp:      int(math.Round(data.Hourly.Temperature[i])),
 			FeelsLike: int(math.Round(data.Hourly.ApparentTemp[i])),
+			Humidity:  humidity,
 			Precip:    fmt.Sprintf("%.2f\"", data.Hourly.Precipitation[i]),
 			PrecipRaw: data.Hourly.Precipitation[i],
 			WindSpeed: int(math.Round(data.Hourly.WindSpeed[i])),
@@ -1031,10 +1051,15 @@ func (s *server) transformNWSHourlyForDay(periods []NWSPeriod, timezone string, 
 		if p.ProbabilityOfPrecipitation.Value != nil {
 			precip = fmt.Sprintf("%d%%", *p.ProbabilityOfPrecipitation.Value)
 		}
+		var humidity int
+		if p.RelativeHumidity.Value != nil {
+			humidity = *p.RelativeHumidity.Value
+		}
 		rows = append(rows, HourlyRow{
 			Time:      t.Format("3 PM"),
 			Temp:      p.Temperature,
 			FeelsLike: windchill(float64(p.Temperature), windSpeed),
+			Humidity:  humidity,
 			Precip:    precip,
 			PrecipRaw: -1, // NWS hourly uses probability, not amount
 			WindSpeed: int(math.Round(windSpeed)),

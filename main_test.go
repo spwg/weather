@@ -53,6 +53,7 @@ func makeOpenMeteoForecastResponse() ForecastResponse {
 	temps := make([]float64, 0, 48)
 	apparent := make([]float64, 0, 48)
 	precip := make([]float64, 0, 48)
+	humidity := make([]float64, 0, 48)
 	wind := make([]float64, 0, 48)
 	windDir := make([]float64, 0, 48)
 	codes := make([]int, 0, 48)
@@ -64,6 +65,7 @@ func makeOpenMeteoForecastResponse() ForecastResponse {
 		temps = append(temps, 30+float64(h%12))
 		apparent = append(apparent, 25+float64(h%12))
 		precip = append(precip, float64(h%3)*0.05)
+		humidity = append(humidity, 50+float64(h%30))
 		wind = append(wind, 5+float64(h%5))
 		windDir = append(windDir, float64((h*30)%360))
 		codes = append(codes, []int{0, 1, 3, 61, 0, 1, 3, 61, 0, 1, 3, 61}[h%12])
@@ -79,6 +81,7 @@ func makeOpenMeteoForecastResponse() ForecastResponse {
 			Temperature:   temps,
 			ApparentTemp:  apparent,
 			Precipitation: precip,
+			Humidity:      humidity,
 			WindSpeed:     wind,
 			WindDirection: windDir,
 			WeatherCode:   codes,
@@ -128,6 +131,7 @@ func makeNWSHourlyPeriods() []NWSPeriod {
 	for i := 0; i < 24; i++ {
 		t := base.Add(time.Duration(i) * time.Hour)
 		pct := (i * 5) % 100
+		rh := 40 + i%40
 		periods = append(periods, NWSPeriod{
 			Number:        i + 1,
 			StartTime:     t.Format(time.RFC3339),
@@ -139,6 +143,9 @@ func makeNWSHourlyPeriods() []NWSPeriod {
 			ProbabilityOfPrecipitation: struct {
 				Value *int `json:"value"`
 			}{intPtr(pct)},
+			RelativeHumidity: struct {
+				Value *int `json:"value"`
+			}{intPtr(rh)},
 		})
 	}
 	return periods
