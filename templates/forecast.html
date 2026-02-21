@@ -18,6 +18,7 @@
             <th>Time</th>
             <th class="num">Temp</th>
             <th class="num">Feels</th>
+            <th class="num">Humid</th>
             <th class="num">Precip</th>
             <th class="num">Wind</th>
             <th>Conditions</th>
@@ -29,6 +30,7 @@
             <td class="time-col">{{.Time}}</td>
             <td class="num temp" data-temp-f="{{.Temp}}">{{.Temp}}°</td>
             <td class="num feels" data-temp-f="{{.FeelsLike}}">{{.FeelsLike}}°</td>
+            <td class="num humid">{{.Humidity}}%</td>
             <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}"{{if ge .PrecipRaw 0.0}} data-precip-in="{{.PrecipRaw}}"{{end}}>{{.Precip}}</td>
             <td class="num wind">{{.WindSpeed}} {{.WindDir}}</td>
             <td class="cond">{{.Condition}}</td>
@@ -42,6 +44,7 @@
             <td class="time-col">{{.Time}}</td>
             <td class="num temp" data-temp-f="{{.Temp}}">{{.Temp}}°</td>
             <td class="num feels" data-temp-f="{{.FeelsLike}}">{{.FeelsLike}}°</td>
+            <td class="num humid">{{.Humidity}}%</td>
             <td class="num precip{{if and (ne .Precip "0.00\"") (ne .Precip "0%")}} has-precip{{end}}"{{if ge .PrecipRaw 0.0}} data-precip-in="{{.PrecipRaw}}"{{end}}>{{.Precip}}</td>
             <td class="num wind">{{.WindSpeed}} {{.WindDir}}</td>
             <td class="cond">{{.Condition}}</td>
@@ -50,7 +53,7 @@
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="6" class="show-more-cell">
+            <td colspan="7" class="show-more-cell">
               <button class="show-more-btn" onclick="var el=document.getElementById('more-hours');var h=el.classList.contains('hidden');el.classList.toggle('hidden');this.textContent=h?'Show less':'Show {{.MoreCount}} more hours';">Show {{.MoreCount}} more hours</button>
             </td>
           </tr>
